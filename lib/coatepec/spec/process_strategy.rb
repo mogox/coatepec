@@ -9,8 +9,10 @@ module Coatepec
     # on overrun), and hands the captured output/JSON to Result. Subclasses
     # (ForkStrategy, SpawnStrategy) only implement how the child is started.
     class ProcessStrategy
-      def initialize(project_root)
+      def initialize(project_root, project: nil, rails_runtime: nil)
         @project_root = project_root
+        @project = project
+        @rails_runtime = rails_runtime
       end
 
       def run(args, timeout_seconds)
