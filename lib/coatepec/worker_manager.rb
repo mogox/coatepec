@@ -36,8 +36,13 @@ module Coatepec
 
     def dispatch(command, args, timeout:, retried: false)
       @lock.synchronize do
+        # The restart check must run against the *pre-existing* snapshot, before
+        # ensure_worker! can re-baseline it by booting a fresh worker: a dead
+        # worker plus a changed Gemfile must still surface
+        # :sidecar_restart_required rather than silently adopting the new bundle.
+        # There is nothing to compare against on the very first dispatch.
+        check_for_restart! if @snapshot
         ensure_worker!
-        check_for_restart!
         perform(command, args, timeout: timeout, retried: retried)
       end
     end
