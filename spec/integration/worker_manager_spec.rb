@@ -5,6 +5,8 @@ require "spec_helper"
 RSpec.describe Coatepec::WorkerManager, type: :integration do
   subject(:manager) { described_class.new(Coatepec::Project.new(FIXTURE_APP_ROOT)) }
 
+  after { manager.stop }
+
   it "lazily boots the worker and reports status" do
     data = manager.status
 

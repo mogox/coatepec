@@ -24,6 +24,10 @@ module Coatepec
       )
     end
 
+    def stop
+      @lock.synchronize { @client&.stop }
+    end
+
     private
 
     def dispatch(command, args, timeout:, retried: false)
