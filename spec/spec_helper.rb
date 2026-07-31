@@ -3,6 +3,13 @@
 require "coatepec"
 require "open3"
 
+# Subprocesses spawned during integration specs (Worker::Client, the CLI)
+# repoint BUNDLE_GEMFILE at the fixture Rails app, which has no dependency
+# on this local coatepec checkout. RUBYLIB keeps coatepec's own lib/ on
+# the child's $LOAD_PATH so `require "coatepec"` still resolves there,
+# without any test or production code needing to know about it directly.
+ENV["RUBYLIB"] = File.expand_path("../lib", __dir__)
+
 Dir[File.join(__dir__, "support/**/*.rb")].sort.each { |f| require f }
 
 RSpec.configure do |config|
