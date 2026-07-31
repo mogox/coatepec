@@ -9,3 +9,6 @@
 
 # rspec failure tracking
 .rspec_status
+
+# Design/plan docs intentionally kept local-only for now (not in git history)
+/docs/superpowers/
