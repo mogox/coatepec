@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require "coatepec"
+require "open3"
+
+Dir[File.join(__dir__, "support/**/*.rb")].sort.each { |f| require f }
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
