@@ -9,3 +9,17 @@
 
 # rspec failure tracking
 .rspec_status
+
+# Design/plan docs intentionally kept local-only for now (not in git history)
+/docs/superpowers/
+
+# Fixture Rails app runtime artifacts
+spec/fixtures/*/tmp/
+spec/fixtures/*/log/
+spec/fixtures/*/.bundle/
+spec/fixtures/*/storage/
+
+# Fixture Rails app secret key (rails new --skip-git does not generate its own
+# .gitignore, so this would otherwise be committed; standard Rails apps always
+# gitignore this file)
+spec/fixtures/*/config/master.key

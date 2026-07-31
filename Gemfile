@@ -11,3 +11,8 @@ gem "rake", "~> 13.0"
 gem "rspec", "~> 3.0"
 
 gem "rubocop", "~> 1.21"
+# rubocop-ast's parallel dependency dropped Ruby 3.2 support as of 2.0.0
+# (requires Ruby >= 3.3); pin below that so `bundle lock` resolves a
+# lockfile installable on the gemspec's full supported range (Ruby >= 3.2),
+# not just this machine's Ruby.
+gem "parallel", "< 2.0"

@@ -1,8 +1,28 @@
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.2
+  Exclude:
+    - "spec/fixtures/**/*"
+    # CI's `bundler-cache: true` installs gems into ./vendor/bundle (inside
+    # the repo tree, for caching) rather than the system gem home. Without
+    # this, RuboCop recursively scans installed gems too and can pick up a
+    # dependency's own dev-only .rubocop.yml (e.g. rbs ships one declaring
+    # plugins we don't have installed), crashing with a LoadError.
+    - "vendor/**/*"
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+Metrics/BlockLength:
+  # RSpec's describe/context/it DSL naturally produces long blocks; this is the
+  # standard exclusion used by rubocop-rspec's own default config. inherit_mode
+  # merges this onto (rather than replacing) RuboCop's own default Exclude list
+  # for this cop, which already exempts **/*.gemspec -- a plain `Exclude:` here
+  # would silently drop that default exemption and flag coatepec.gemspec.
+  inherit_mode:
+    merge:
+      - Exclude
+  Exclude:
+    - "spec/**/*_spec.rb"

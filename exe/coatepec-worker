@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "coatepec"
+
+# Preserve a real handle to the OS stdout fd for the private NDJSON
+# protocol before Rails boot has a chance to write banners/logs to it.
+protocol_output = $stdout.dup
+$stdout = $stderr
+
+project_root = ARGV[0] || Dir.pwd
+Coatepec::Worker::Server.new(project_root, input: $stdin, protocol_output: protocol_output).run
