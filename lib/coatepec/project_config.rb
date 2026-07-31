@@ -26,7 +26,10 @@ module Coatepec
       return {} unless File.exist?(path)
 
       parse(File.read(path))
-    rescue Psych::SyntaxError => e
+    # Psych::Exception, not just SyntaxError: safe_load also raises
+    # AliasesNotEnabled (anchors/aliases) and DisallowedClass (e.g. an
+    # unquoted date), which are equally the user's config being wrong.
+    rescue Psych::Exception => e
       raise Coatepec::Error.new(:invalid_config, "Invalid .coatepec.yml: #{e.message}")
     end
 

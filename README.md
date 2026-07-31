@@ -60,12 +60,16 @@ This is opt-in because forking a process with native extensions loaded
 isn't universally safe. Before each fork, Coatepec checks the worker's
 live thread count against its post-boot baseline and its loaded gems
 against a denylist, falling back to a fresh spawn for that one call if
-either check looks risky. If a fork is attempted and the child crashes
+either check looks risky. The built-in denylist ships empty -- no single
+gem has been confirmed as the culprit yet -- so the guard is effectively
+thread-count-only until a project adds its own
+`macos_fork_unsafe_gems`. If a fork is attempted and the child crashes
 anyway, Coatepec transparently retries via spawn and returns that result
 -- fork stays enabled for later calls. Every `rails_spec_run` result
 includes an `execution_mode` field (`fork`, `spawn_fallback`, or
 `spawn_after_crash`) so you can see which path actually ran for a given
-call.
+call; `spawn_after_crash` results also carry the crashed fork's own stderr
+under `crashed_fork_stderr` so the crash can be diagnosed.
 
 ## Tools
 
@@ -85,8 +89,9 @@ checkout.
 
 ## Compatibility
 
-Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`. CI tests Rails 8.1 (primary) and Rails
-7.1 (compat lane).
+Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`. CI tests three lanes: Rails 8.1 on
+Linux (primary), Rails 7.1 on Linux (compat), and Rails 8.1 on macOS (which
+is where the guarded-fork path below actually forks).
 
 ## Development
 

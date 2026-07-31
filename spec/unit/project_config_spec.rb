@@ -56,4 +56,21 @@ RSpec.describe Coatepec::ProjectConfig do
     expect { described_class.new(@tmp) }
       .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_config) }
   end
+
+  # safe_load rejects these as Psych::DisallowedClass/AliasesNotEnabled --
+  # neither is a Psych::SyntaxError, so both used to escape as raw Psych
+  # exceptions and surface as :internal_error.
+  it "raises invalid_config for a value safe_load disallows (an unquoted date)" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: 2026-01-01\n")
+
+    expect { described_class.new(@tmp) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_config) }
+  end
+
+  it "raises invalid_config for YAML aliases" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "a: &anchor [x]\nmacos_fork_unsafe_gems: *anchor\n")
+
+    expect { described_class.new(@tmp) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_config) }
+  end
 end

@@ -20,7 +20,7 @@ module Coatepec
         err_r, err_w = IO.pipe
         json_path = Tempfile.create(["coatepec-rspec", ".json"], &:path)
 
-        pid = start(args + json_format_args(json_path), out_w, err_w)
+        pid = start_or_release(args, out_w, err_w, json_path, [out_r, err_r])
         [out_w, err_w].each(&:close)
 
         reap(pid, out_r, err_r, timeout_seconds, json_path)
@@ -32,6 +32,18 @@ module Coatepec
       # must be wired to out_w/err_w.
       def start(_full_args, _out_w, _err_w)
         raise NotImplementedError, "#{self.class} must implement #start"
+      end
+
+      # A failed #start (Process.fork can raise Errno::EAGAIN/ENOMEM outright)
+      # leaves no child to reap, so the fds and tempfile #reap would have
+      # released have to be freed here. The original exception still reaches
+      # the caller -- only GuardedForkStrategy intercepts it to fall back.
+      def start_or_release(args, out_w, err_w, json_path, read_ends)
+        start(args + json_format_args(json_path), out_w, err_w)
+      rescue StandardError
+        ([out_w, err_w] + read_ends).each { |io| io.close unless io.closed? }
+        File.delete(json_path) if File.exist?(json_path)
+        raise
       end
 
       def json_format_args(json_path)

@@ -21,6 +21,21 @@ module Coatepec
 
       CRASH_SIGNAL_NAMES = %w[ABRT SEGV BUS].freeze
 
+      # A crash retry shares one timeout budget with the fork attempt that
+      # preceded it: WorkerManager only gives the whole dispatch
+      # timeout_seconds + 10 before Client#read_response raises
+      # DisconnectedError and the warm worker is restarted from scratch --
+      # exactly the boot this feature exists to preserve. The floor keeps a
+      # nearly-exhausted budget from turning the retry into a guaranteed
+      # timeout kill; a few seconds is enough for a fast spec to still land.
+      MIN_RETRY_TIMEOUT_SECONDS = 5
+
+      # The crashed child's stderr carries the macOS crash report -- the only
+      # evidence that could ever populate BUILTIN_UNSAFE_GEMS from a real
+      # incident. Kept far below Result::MAX_OUTPUT_BYTES because it rides
+      # along with a whole second result inside MCP::Response's 1 MiB cap.
+      MAX_CRASH_STDERR_BYTES = 4 * 1024
+
       def initialize(project_root, project: nil, rails_runtime: nil)
         super
         @spawn_strategy = SpawnStrategy.new(project_root)
@@ -29,13 +44,40 @@ module Coatepec
       def run(args, timeout_seconds)
         return fallback_result(args, timeout_seconds, "spawn_fallback") unless guard_passes?
 
-        result = super
+        started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        begin
+          result = super
+        rescue SystemCallError
+          # Process.fork itself failed (Errno::EAGAIN/ENOMEM under
+          # process-table pressure), so no child was ever produced -- from the
+          # caller's side that is indistinguishable from a failed guard, hence
+          # the same mode. Opting into macos_fork must never surface an error
+          # that plain SpawnStrategy wouldn't have.
+          return fallback_result(args, timeout_seconds, "spawn_fallback")
+        end
         return result.merge(execution_mode: "fork") unless crashed?(result)
 
-        fallback_result(args, timeout_seconds, "spawn_after_crash")
+        retry_after_crash(args, timeout_seconds, started_at, result)
       end
 
       private
+
+      def retry_after_crash(args, timeout_seconds, started_at, crashed)
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+        remaining = [timeout_seconds - elapsed, MIN_RETRY_TIMEOUT_SECONDS].max
+
+        fallback_result(args, remaining, "spawn_after_crash")
+          .merge(crashed_fork_stderr: crash_diagnostics(crashed))
+      end
+
+      # Keeps the tail, matching Result#read_bounded: a crash report's tail is
+      # where the signal and backtrace land.
+      def crash_diagnostics(result)
+        text = result[:stderr].to_s
+        return text unless text.bytesize > MAX_CRASH_STDERR_BYTES
+
+        text.byteslice(-MAX_CRASH_STDERR_BYTES, MAX_CRASH_STDERR_BYTES)
+      end
 
       def fallback_result(args, timeout_seconds, mode)
         @spawn_strategy.run(args, timeout_seconds).merge(execution_mode: mode)

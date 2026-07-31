@@ -29,11 +29,16 @@ module Coatepec
       def strategy_class
         case RbConfig::CONFIG["host_os"]
         when /linux/ then ForkStrategy
+        # The macos_fork config key governs this whole branch, BSD included --
+        # the name tracks the documented macOS incident, not the platform set.
         when /darwin|bsd/ then macos_strategy_class
         else raise Coatepec::Error.new(:unsupported_platform, "Coatepec supports macOS and Linux only")
         end
       end
 
+      # Reading @project.config here means an invalid .coatepec.yml only
+      # raises :invalid_config on macOS -- the Linux branch never touches it.
+      # Accepted asymmetry: the file exists to configure this branch.
       def macos_strategy_class
         @project.config.macos_fork? ? GuardedForkStrategy : SpawnStrategy
       end
