@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "coatepec/version"
+require_relative "coatepec/errors"
 
 module Coatepec
-  class Error < StandardError; end
-  # Your code goes here...
 end
