@@ -39,4 +39,15 @@ RSpec.describe Coatepec::Project do
       File.join(File.expand_path(@tmp), "packs/schools/spec")
     )
   end
+
+  it "exposes a memoized ProjectConfig rooted at the project root" do
+    File.write(File.join(@tmp, "Gemfile"), "source 'https://rubygems.org'\n")
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: true\n")
+
+    project = described_class.new(@tmp)
+
+    expect(project.config).to be_a(Coatepec::ProjectConfig)
+    expect(project.config.macos_fork?).to be(true)
+    expect(project.config).to equal(project.config)
+  end
 end
