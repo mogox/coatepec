@@ -24,7 +24,11 @@ module Coatepec
       private
 
       def strategy_class
-        RbConfig::CONFIG["host_os"].match?(/linux/) ? ForkStrategy : SpawnStrategy
+        case RbConfig::CONFIG["host_os"]
+        when /linux/ then ForkStrategy
+        when /darwin|bsd/ then SpawnStrategy
+        else raise Coatepec::Error.new(:unsupported_platform, "Coatepec supports macOS and Linux only")
+        end
       end
 
       def require_rspec!

@@ -27,7 +27,8 @@ module Coatepec
     def self.apply_flag!(options, arg, remaining)
       case arg
       when "--root" then options[:root] = remaining.shift
-      when "--debug" then options[:debug] = true
+      when "--debug" then (options[:debug] = true
+                           ENV["COATEPEC_DEBUG"] = "1")
       when "--version" then (puts Coatepec::VERSION
                              exit 0)
       when "--help" then (puts "Usage: coatepec --root PATH [--debug]"

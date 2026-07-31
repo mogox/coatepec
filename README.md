@@ -34,9 +34,6 @@ Coatepec parent (Rails-free)
                               `-- macOS:  Process.spawn --> fresh RSpec process
 ```
 
-See [Design](docs/superpowers/specs/2026-07-30-spec-runner-v1-design.md) for
-the full rationale.
-
 ## Tools
 
 | Tool | Input | Notes |

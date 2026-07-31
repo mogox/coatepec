@@ -16,6 +16,21 @@ RSpec.describe Coatepec::MCP::Response do
         "meta" => { "environment" => "test" }
       )
     end
+
+    it "returns a response_too_large error when the envelope exceeds 1 MiB" do
+      response = described_class.ok(data: { blob: "x" * (2 * 1024 * 1024) })
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["ok"]).to be(false)
+      expect(payload["error"]["code"]).to eq("response_too_large")
+    end
+
+    it "does not flag an envelope that fits within the limit" do
+      response = described_class.ok(data: { blob: "x" * 1024 })
+
+      expect(response.error?).to be(false)
+    end
   end
 
   describe ".error" do

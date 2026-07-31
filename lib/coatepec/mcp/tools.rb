@@ -16,7 +16,8 @@ module Coatepec
           fail_fast: { type: "boolean" },
           timeout_seconds: { type: "integer", minimum: 1, maximum: 900 }
         },
-        required: ["paths"]
+        required: ["paths"],
+        additionalProperties: false
       )
 
       class << self
@@ -44,12 +45,15 @@ module Coatepec
     end
 
     # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
-    # versions, PID, boot_id, and lifecycle state without booting it eagerly.
+    # versions, PID, boot_id, and lifecycle state. Worker::Server#handle boots
+    # the Rails runtime before dispatching any command, so the first call to
+    # this tool starts (and blocks on) a full Rails boot just like a spec run.
     class RuntimeStatusTool < ::MCP::Tool
       tool_name "rails_runtime_status"
-      description "Report the Coatepec test worker's identity and boot status"
+      description "Report the Coatepec test worker's identity and boot status " \
+                  "(boots the warm worker if it is not up yet)"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
-      input_schema(properties: {}, required: [])
+      input_schema(properties: {}, required: [], additionalProperties: false)
 
       class << self
         def call(server_context:)

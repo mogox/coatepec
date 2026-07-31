@@ -49,4 +49,21 @@ RSpec.describe "Coatepec MCP tools" do
 
     expect(server.tools.keys).to contain_exactly("rails_spec_run", "rails_runtime_status")
   end
+
+  describe "input schema strictness" do
+    it "rejects unknown arguments to rails_spec_run" do
+      expect { Coatepec::MCP::SpecRunTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"], "oops" => 1) }
+        .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects unknown arguments to rails_runtime_status" do
+      expect { Coatepec::MCP::RuntimeStatusTool.input_schema.validate_arguments("oops" => 1) }
+        .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "still accepts the documented rails_spec_run arguments" do
+      expect { Coatepec::MCP::SpecRunTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"]) }
+        .not_to raise_error
+    end
+  end
 end
