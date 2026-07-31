@@ -12,6 +12,7 @@ require_relative "coatepec/spec/process_strategy"
 require_relative "coatepec/spec/fork_strategy"
 require_relative "coatepec/spec/spawn_strategy"
 require_relative "coatepec/spec/runner"
+require_relative "coatepec/worker/server"
 
 module Coatepec
 end
