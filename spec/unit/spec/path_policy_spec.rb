@@ -64,4 +64,27 @@ RSpec.describe Coatepec::Spec::PathPolicy do
     expect { policy.validate!(["spec/models/missing_spec.rb"]) }
       .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
   end
+
+  it "rejects an invalid line suffix (non-digits)" do
+    expect { policy.validate!(["spec/models/widget_spec.rb:27; rm -rf /"]) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+  end
+
+  it "rejects a symlink escape to outside the project root" do
+    outside_dir = File.dirname(@tmp)
+    outside_spec = File.join(outside_dir, "outside_spec.rb")
+    File.write(outside_spec, "")
+    begin
+      File.symlink(outside_spec, File.join(@tmp, "spec/escaped_spec.rb"))
+      expect { policy.validate!(["spec/escaped_spec.rb"]) }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+    ensure
+      File.unlink(outside_spec) if File.exist?(outside_spec)
+    end
+  end
+
+  it "rejects a selector containing a NUL byte" do
+    expect { policy.validate!(["spec/test\x00_spec.rb"]) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+  end
 end

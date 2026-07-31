@@ -25,11 +25,18 @@ module Coatepec
       def validate_one(selector)
         path_part, line_part = selector.to_s.split(":", 2)
         reject_shape!(selector, path_part)
+        reject_line_part!(selector, line_part) if line_part
 
-        full_path = File.expand_path(path_part, @project.root)
-        raise Coatepec::Error.new(:invalid_spec_path, "Spec path does not exist: #{selector}") unless File.exist?(full_path)
+        begin
+          full_path = File.expand_path(path_part, @project.root)
+          raise Coatepec::Error.new(:invalid_spec_path, "Spec path does not exist: #{selector}") unless File.exist?(full_path)
+          real_path = File.realpath(full_path)
+        rescue Coatepec::Error
+          raise
+        rescue ArgumentError, Errno::EACCES, Errno::ENOENT, Errno::ENOTDIR => e
+          raise Coatepec::Error.new(:invalid_spec_path, "Invalid spec path: #{selector} (#{e.class.name})")
+        end
 
-        real_path = File.realpath(full_path)
         reject_escape!(selector, real_path)
         reject_wrong_kind!(selector, real_path)
 
@@ -42,6 +49,12 @@ module Coatepec
         return unless path_part.split("/").include?("..")
 
         raise Coatepec::Error.new(:invalid_spec_path, "Path traversal is not allowed: #{selector}")
+      end
+
+      def reject_line_part!(selector, line_part)
+        return if line_part =~ /\A\d+\z/
+
+        raise Coatepec::Error.new(:invalid_spec_path, "Line number must be digits only: #{selector}")
       end
 
       def reject_escape!(selector, real_path)
