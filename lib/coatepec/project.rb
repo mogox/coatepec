@@ -22,5 +22,9 @@ module Coatepec
         *Dir.glob(File.join(root, "gems/*/spec"))
       ].select { |path| File.directory?(path) }
     end
+
+    def config
+      @config ||= ProjectConfig.new(root)
+    end
   end
 end
