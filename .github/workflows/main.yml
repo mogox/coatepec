@@ -40,3 +40,17 @@ jobs:
       - run: bundle exec rspec spec/unit spec/integration
         env:
           COATEPEC_FIXTURE_APP: rails_app_7_1
+
+  macos:
+    runs-on: macos-latest
+    name: Ruby 3.4 / Rails 8.1 (macOS)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+      - name: Install fixture app dependencies
+        run: bundle install
+        working-directory: spec/fixtures/rails_app
+      - run: bundle exec rake
