@@ -8,7 +8,12 @@ module FixtureAppProcess
       "RAILS_ENV" => "test"
     }
 
-    Open3.capture3(env, RbConfig.ruby, "-I", lib_path, "-e", ruby_code, chdir: FIXTURE_APP_ROOT)
+    # Mirrors Worker::Client#spawn_worker's Bundler.with_unbundled_env: this
+    # process runs under coatepec's own bundle, whose GEM_PATH must not leak
+    # into the fixture app's separately-installed gems.
+    Bundler.with_unbundled_env do
+      Open3.capture3(env, RbConfig.ruby, "-I", lib_path, "-e", ruby_code, chdir: FIXTURE_APP_ROOT)
+    end
   end
 end
 

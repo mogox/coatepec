@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "bundler"
+
 module Coatepec
   module Worker
     # The parent-process handle to a spawned test worker: owns its pipes,
@@ -62,11 +64,22 @@ module Coatepec
 
       def spawn_worker(to_worker_r, from_worker_w)
         worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
-        Process.spawn(
-          { "BUNDLE_GEMFILE" => File.join(@project_root, "Gemfile") },
-          RbConfig.ruby, worker_exe, @project_root,
-          in: to_worker_r, out: from_worker_w, err: :err, chdir: @project_root
-        )
+        lib_path = File.expand_path("../..", __dir__)
+        # If this process is itself running under a Bundler context (e.g. the
+        # host app's own deployment-mode bundle), Bundler.setup has already
+        # narrowed GEM_PATH/RUBYOPT to that bundle's install location. Without
+        # stripping that, the worker -- which needs the target app's own
+        # separately-installed gems -- inherits a GEM_PATH that can't see them
+        # and fails with a spurious Bundler::GemNotFound. with_unbundled_env
+        # also resets RUBYLIB to its pre-Bundler snapshot, so it must be set
+        # explicitly here rather than relying on the caller's environment.
+        Bundler.with_unbundled_env do
+          Process.spawn(
+            { "BUNDLE_GEMFILE" => File.join(@project_root, "Gemfile"), "RUBYLIB" => lib_path },
+            RbConfig.ruby, worker_exe, @project_root,
+            in: to_worker_r, out: from_worker_w, err: :err, chdir: @project_root
+          )
+        end
       end
 
       def read_response(id, timeout)

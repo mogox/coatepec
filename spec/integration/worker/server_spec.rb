@@ -17,11 +17,16 @@ RSpec.describe "coatepec-worker executable", type: :integration do
 
   def spawn_worker_process(lib_path, to_worker_r, from_worker_w)
     worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
-    Process.spawn(
-      { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RUBYLIB" => lib_path },
-      RbConfig.ruby, worker_exe, FIXTURE_APP_ROOT,
-      in: to_worker_r, out: from_worker_w, err: :err, chdir: FIXTURE_APP_ROOT
-    )
+    # Mirrors Worker::Client#spawn_worker's Bundler.with_unbundled_env: this
+    # process runs under coatepec's own bundle, whose GEM_PATH must not leak
+    # into the fixture app's separately-installed gems.
+    Bundler.with_unbundled_env do
+      Process.spawn(
+        { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RUBYLIB" => lib_path },
+        RbConfig.ruby, worker_exe, FIXTURE_APP_ROOT,
+        in: to_worker_r, out: from_worker_w, err: :err, chdir: FIXTURE_APP_ROOT
+      )
+    end
   end
 
   after do
