@@ -8,7 +8,7 @@ module Coatepec
     # per worker process and reports its identity (pid, boot_id, versions,
     # lifecycle state) for rails_runtime_status.
     class RailsRuntime
-      attr_reader :pid, :boot_id, :boot_duration_ms, :ruby_version, :rails_version
+      attr_reader :pid, :boot_id, :boot_duration_ms, :ruby_version, :rails_version, :post_boot_thread_count
 
       def initialize(project_root)
         @project_root = project_root
@@ -43,6 +43,13 @@ module Coatepec
         }
       end
 
+      # Loaded gem names for GuardedForkStrategy's denylist check. RailsRuntime
+      # itself has no notion of macOS or forking -- it only exposes the raw
+      # fact of what's loaded.
+      def loaded_gem_names
+        Gem.loaded_specs.keys.map(&:to_s)
+      end
+
       private
 
       def record_boot!(started_at)
@@ -51,6 +58,7 @@ module Coatepec
         @ruby_version = RUBY_VERSION
         @rails_version = Rails.version
         @boot_duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+        @post_boot_thread_count = Thread.list.count
         @booted = true
       end
     end

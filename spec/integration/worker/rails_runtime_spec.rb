@@ -24,6 +24,26 @@ RSpec.describe Coatepec::Worker::RailsRuntime, type: :integration do
     expect(result["lifecycle_state"]).to eq("ready")
   end
 
+  it "records the post-boot thread count and loaded gem names" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      runtime = Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect})
+      runtime.boot!
+      puts JSON.generate(
+        post_boot_thread_count: runtime.post_boot_thread_count,
+        loaded_gem_names: runtime.loaded_gem_names
+      )
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["post_boot_thread_count"]).to be > 0
+    expect(result["loaded_gem_names"]).to include("rails")
+  end
+
   it "raises worker_failure when config/environment.rb does not exist" do
     runtime = described_class.new("/nonexistent/project")
 
