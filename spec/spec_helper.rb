@@ -3,11 +3,13 @@
 require "coatepec"
 require "open3"
 
-# Subprocesses spawned during integration specs (Worker::Client, the CLI)
-# repoint BUNDLE_GEMFILE at the fixture Rails app, which has no dependency
-# on this local coatepec checkout. RUBYLIB keeps coatepec's own lib/ on
-# the child's $LOAD_PATH so `require "coatepec"` still resolves there,
-# without any test or production code needing to know about it directly.
+# Worker::Client repoints its spawned worker subprocess's BUNDLE_GEMFILE at
+# the fixture Rails app, which has no dependency on this local coatepec
+# checkout. RUBYLIB keeps coatepec's own lib/ on that child's $LOAD_PATH so
+# `require "coatepec"` still resolves there, without Worker::Client needing
+# to know about it directly. The outer coatepec CLI process does not repoint
+# BUNDLE_GEMFILE — it runs under coatepec's own bundle, as it does in
+# production.
 ENV["RUBYLIB"] = File.expand_path("../lib", __dir__)
 
 Dir[File.join(__dir__, "support/**/*.rb")].sort.each { |f| require f }
