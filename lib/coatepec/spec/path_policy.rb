@@ -2,6 +2,10 @@
 
 module Coatepec
   module Spec
+    # Validates rails_spec_run's `paths` selectors against the allowed spec
+    # roots before any RSpec process is started, rejecting absolute paths,
+    # `..` traversal, symlink escapes, non-`_spec.rb` files, and oversized
+    # selector lists.
     class PathPolicy
       MAX_SELECTORS = 100
 
@@ -10,9 +14,7 @@ module Coatepec
       end
 
       def validate!(selectors)
-        if selectors.nil? || selectors.empty?
-          raise Coatepec::Error.new(:invalid_spec_path, "No spec paths given")
-        end
+        raise Coatepec::Error.new(:invalid_spec_path, "No spec paths given") if selectors.nil? || selectors.empty?
         if selectors.size > MAX_SELECTORS
           raise Coatepec::Error.new(:invalid_spec_path, "At most #{MAX_SELECTORS} spec paths are allowed")
         end
@@ -27,25 +29,33 @@ module Coatepec
         reject_shape!(selector, path_part)
         reject_line_part!(selector, line_part) if line_part
 
-        begin
-          full_path = File.expand_path(path_part, @project.root)
-          raise Coatepec::Error.new(:invalid_spec_path, "Spec path does not exist: #{selector}") unless File.exist?(full_path)
-          real_path = File.realpath(full_path)
-        rescue Coatepec::Error
-          raise
-        rescue ArgumentError, Errno::EACCES, Errno::ENOENT, Errno::ENOTDIR => e
-          raise Coatepec::Error.new(:invalid_spec_path, "Invalid spec path: #{selector} (#{e.class.name})")
-        end
-
+        real_path = resolve_real_path!(selector, path_part)
         reject_escape!(selector, real_path)
         reject_wrong_kind!(selector, real_path)
 
         line_part ? "#{path_part}:#{line_part}" : path_part
       end
 
+      def resolve_real_path!(selector, path_part)
+        full_path = File.expand_path(path_part, @project.root)
+        unless File.exist?(full_path)
+          raise Coatepec::Error.new(:invalid_spec_path,
+                                    "Spec path does not exist: #{selector}")
+        end
+
+        File.realpath(full_path)
+      rescue Coatepec::Error
+        raise
+      rescue ArgumentError, Errno::EACCES, Errno::ENOENT, Errno::ENOTDIR => e
+        raise Coatepec::Error.new(:invalid_spec_path, "Invalid spec path: #{selector} (#{e.class.name})")
+      end
+
       def reject_shape!(selector, path_part)
         raise Coatepec::Error.new(:invalid_spec_path, "Blank selector") if path_part.to_s.strip.empty?
-        raise Coatepec::Error.new(:invalid_spec_path, "Absolute paths are not allowed: #{selector}") if path_part.start_with?("/")
+        if path_part.start_with?("/")
+          raise Coatepec::Error.new(:invalid_spec_path,
+                                    "Absolute paths are not allowed: #{selector}")
+        end
         return unless path_part.split("/").include?("..")
 
         raise Coatepec::Error.new(:invalid_spec_path, "Path traversal is not allowed: #{selector}")
@@ -67,7 +77,8 @@ module Coatepec
       def reject_wrong_kind!(selector, real_path)
         return if under_allowed_root?(real_path) && (File.directory?(real_path) || real_path.end_with?("_spec.rb"))
 
-        raise Coatepec::Error.new(:invalid_spec_path, "Spec path is not an allowed spec root or _spec.rb file: #{selector}")
+        raise Coatepec::Error.new(:invalid_spec_path,
+                                  "Spec path is not an allowed spec root or _spec.rb file: #{selector}")
       end
 
       def under_allowed_root?(real_path)

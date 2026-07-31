@@ -2,6 +2,9 @@
 
 module Coatepec
   module Spec
+    # Runs RSpec in a freshly `Process.spawn`ed `bundle exec rspec` (macOS
+    # and any platform without a working fork): slower per run since Rails
+    # boots from scratch, but avoids fork-safety pitfalls.
     class SpawnStrategy < ProcessStrategy
       private
 

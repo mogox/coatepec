@@ -5,8 +5,8 @@ require "coatepec"
 
 # Preserve a real handle to the OS stdout fd for the private NDJSON
 # protocol before Rails boot has a chance to write banners/logs to it.
-protocol_output = STDOUT.dup
-$stdout = STDERR
+protocol_output = $stdout.dup
+$stdout = $stderr
 
 project_root = ARGV[0] || Dir.pwd
-Coatepec::Worker::Server.new(project_root, input: STDIN, protocol_output: protocol_output).run
+Coatepec::Worker::Server.new(project_root, input: $stdin, protocol_output: protocol_output).run

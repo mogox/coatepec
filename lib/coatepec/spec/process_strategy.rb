@@ -4,6 +4,10 @@ require "tempfile"
 
 module Coatepec
   module Spec
+    # Shared child-process lifecycle for running an isolated RSpec run: spawns
+    # (via a subclass's #start), reaps with a timeout budget (TERM then KILL
+    # on overrun), and hands the captured output/JSON to Result. Subclasses
+    # (ForkStrategy, SpawnStrategy) only implement how the child is started.
     class ProcessStrategy
       def initialize(project_root)
         @project_root = project_root
@@ -12,7 +16,7 @@ module Coatepec
       def run(args, timeout_seconds)
         out_r, out_w = IO.pipe
         err_r, err_w = IO.pipe
-        json_path = Tempfile.create(["coatepec-rspec", ".json"]) { |f| f.path }
+        json_path = Tempfile.create(["coatepec-rspec", ".json"], &:path)
 
         pid = start(args + json_format_args(json_path), out_w, err_w)
         [out_w, err_w].each(&:close)

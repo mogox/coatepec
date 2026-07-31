@@ -3,6 +3,8 @@
 require "json"
 
 module Coatepec
+  # Reads and writes the newline-delimited JSON (NDJSON) messages exchanged
+  # with the test worker over its private stdio pipe.
   class Protocol
     class FramingError < StandardError; end
 

@@ -4,6 +4,9 @@ require "json"
 
 module Coatepec
   module Spec
+    # Turns a finished RSpec child process's exit status, captured
+    # stdout/stderr (each capped at MAX_OUTPUT_BYTES), and RSpec's own JSON
+    # formatter output into the flat result hash rails_spec_run returns.
     module Result
       MAX_OUTPUT_BYTES = 256 * 1024
 
@@ -20,6 +23,10 @@ module Coatepec
         )
       end
 
+      # rubocop:disable Metrics/MethodLength -- one flat hash literal mapping
+      # Process::Status/captured-output fields to the result payload's own
+      # field names; splitting it would scatter that 1:1 mapping across
+      # methods for no readability gain.
       def base(pid, status, stdout_result, stderr_result)
         {
           status: status.exited? && status.exitstatus.zero? ? "passed" : "failed",
@@ -35,6 +42,7 @@ module Coatepec
           stderr_truncated: stderr_result[:truncated]
         }
       end
+      # rubocop:enable Metrics/MethodLength
 
       def read_summary(json_path)
         return nil unless File.exist?(json_path) && !File.empty?(json_path)

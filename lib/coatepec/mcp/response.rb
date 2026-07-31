@@ -5,6 +5,9 @@ require "mcp"
 
 module Coatepec
   module MCP
+    # Builds the pretty-printed JSON `{ok: true, data:, meta:}` / `{ok: false,
+    # error:}` envelope that every Coatepec tool response wraps in a single
+    # text content block.
     module Response
       module_function
 

@@ -4,6 +4,9 @@ require "securerandom"
 
 module Coatepec
   module Worker
+    # Boots the fixture/target Rails app under RAILS_ENV=test exactly once
+    # per worker process and reports its identity (pid, boot_id, versions,
+    # lifecycle state) for rails_runtime_status.
     class RailsRuntime
       attr_reader :pid, :boot_id, :boot_duration_ms, :ruby_version, :rails_version
 
@@ -20,13 +23,7 @@ module Coatepec
         started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         ENV["RAILS_ENV"] = "test"
         require File.join(@project_root, "config/environment")
-
-        @pid = Process.pid
-        @boot_id = SecureRandom.hex(8)
-        @ruby_version = RUBY_VERSION
-        @rails_version = Rails.version
-        @boot_duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-        @booted = true
+        record_boot!(started_at)
       rescue Coatepec::Error
         raise
       rescue StandardError, LoadError => e
@@ -44,6 +41,17 @@ module Coatepec
           coatepec_version: Coatepec::VERSION,
           lifecycle_state: booted? ? "ready" : "not_started"
         }
+      end
+
+      private
+
+      def record_boot!(started_at)
+        @pid = Process.pid
+        @boot_id = SecureRandom.hex(8)
+        @ruby_version = RUBY_VERSION
+        @rails_version = Rails.version
+        @boot_duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+        @booted = true
       end
     end
   end

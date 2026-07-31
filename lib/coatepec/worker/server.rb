@@ -2,6 +2,9 @@
 
 module Coatepec
   module Worker
+    # The test worker's message loop: reads NDJSON requests from its parent
+    # over Protocol, lazily boots Rails on first use, dispatches `status`/
+    # `spec_run`, and writes back structured ok/error responses.
     class Server
       def initialize(project_root, input:, protocol_output:)
         @protocol = Protocol.new(input: input, output: protocol_output)

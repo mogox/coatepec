@@ -25,8 +25,8 @@ RSpec.describe "coatepec end-to-end", type: :integration do
 
     begin
       send_request(stdin, 1, "initialize", {
-        protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1.0" }
-      })
+                     protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1.0" }
+                   })
       init_response = read_response(stdout)
       expect(init_response["result"]["serverInfo"]["name"]).to eq("coatepec")
 

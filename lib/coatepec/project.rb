@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module Coatepec
+  # A Rails application checkout rooted at an absolute path (must contain a
+  # Gemfile); knows where its own and pack/engine/gem spec directories live.
   class Project
     attr_reader :root
 

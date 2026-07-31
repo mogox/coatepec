@@ -15,7 +15,8 @@ RSpec.describe Coatepec::WorkerManager, type: :integration do
   end
 
   it "runs a spec through the warm worker" do
-    data = manager.run_spec(paths: ["spec/passing_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 30)
+    data = manager.run_spec(paths: ["spec/passing_spec.rb"], example: nil, seed: nil, fail_fast: false,
+                            timeout_seconds: 30)
 
     expect(data[:status]).to eq("passed")
   end

@@ -2,6 +2,8 @@
 
 module Coatepec
   module MCP
+    # The `rails_spec_run` MCP tool: runs targeted RSpec examples against
+    # the warm test worker and returns a structured pass/fail result.
     class SpecRunTool < ::MCP::Tool
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples against a warm, isolated Rails test worker"
@@ -18,7 +20,11 @@ module Coatepec
       )
 
       class << self
+        # rubocop:disable Metrics/ParameterLists -- mirrors the tool's own input_schema
+        # (paths/example/seed/fail_fast/timeout_seconds) plus the MCP-framework-injected
+        # server_context; splitting it would fight the ::MCP::Tool#call contract.
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120)
+          # rubocop:enable Metrics/ParameterLists
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds
@@ -37,6 +43,8 @@ module Coatepec
       end
     end
 
+    # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
+    # versions, PID, boot_id, and lifecycle state without booting it eagerly.
     class RuntimeStatusTool < ::MCP::Tool
       tool_name "rails_runtime_status"
       description "Report the Coatepec test worker's identity and boot status"
@@ -48,7 +56,9 @@ module Coatepec
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].status
           duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          Response.ok(data: data, meta: { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms })
+          Response.ok(data: data,
+                      meta: { project_root: server_context[:project_root], environment: "test",
+                              duration_ms: duration_ms })
         rescue Coatepec::Error => e
           Response.error(e)
         end

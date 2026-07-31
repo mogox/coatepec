@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module Coatepec
+  # Structured error carrying a stable machine-readable `code` (and optional
+  # `details`) that MCP tool handlers translate into JSON error responses.
   class Error < StandardError
     attr_reader :code, :details
 

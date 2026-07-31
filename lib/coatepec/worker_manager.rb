@@ -3,6 +3,10 @@
 require "monitor"
 
 module Coatepec
+  # Owns the single warm Worker::Client for a project: lazily starts it,
+  # restarts it when ChangeDetector flags a boot-file change, escalates a
+  # Gemfile change to :sidecar_restart_required, and retries a request once
+  # if the worker had died since the last dispatch.
   class WorkerManager
     def initialize(project)
       @project = project
@@ -34,16 +38,17 @@ module Coatepec
       @lock.synchronize do
         ensure_worker!
         check_for_restart!
-
-        begin
-          @client.request(command, args, timeout: timeout)
-        rescue Worker::Client::DisconnectedError
-          raise Coatepec::Error.new(:worker_disconnected, "Worker disconnected") if retried
-
-          restart_worker!
-          dispatch(command, args, timeout: timeout, retried: true)
-        end
+        perform(command, args, timeout: timeout, retried: retried)
       end
+    end
+
+    def perform(command, args, timeout:, retried:)
+      @client.request(command, args, timeout: timeout)
+    rescue Worker::Client::DisconnectedError
+      raise Coatepec::Error.new(:worker_disconnected, "Worker disconnected") if retried
+
+      restart_worker!
+      dispatch(command, args, timeout: timeout, retried: true)
     end
 
     def check_for_restart!

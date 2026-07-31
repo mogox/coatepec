@@ -2,6 +2,9 @@
 
 module Coatepec
   module Worker
+    # Fingerprints Gemfile/Gemfile.lock and boot-relevant files (mtime +
+    # size) so WorkerManager can decide whether a bundle change requires the
+    # whole sidecar to restart, or a boot-file change just the worker.
     class ChangeDetector
       BUNDLE_FILES = %w[Gemfile Gemfile.lock].freeze
       BOOT_FILES = %w[config/boot.rb config/application.rb config/environment.rb config/environments/test.rb].freeze
@@ -26,8 +29,8 @@ module Coatepec
 
       def initializer_files
         Dir.glob(File.join(@project_root, "config/initializers/**/*.rb"))
-          .sort
-          .map { |f| f.delete_prefix("#{@project_root}/") }
+           .sort
+           .map { |f| f.delete_prefix("#{@project_root}/") }
       end
 
       def fingerprint(relative_paths)

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 require "coatepec/project"
 require "tmpdir"
@@ -5,7 +7,10 @@ require "fileutils"
 
 RSpec.describe Coatepec::Project do
   around do |example|
-    Dir.mktmpdir { |dir| @tmp = dir; example.run }
+    Dir.mktmpdir do |dir|
+      @tmp = dir
+      example.run
+    end
   end
 
   it "expands and accepts a root that has a Gemfile" do

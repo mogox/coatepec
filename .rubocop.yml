@@ -1,5 +1,5 @@
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 3.2
   Exclude:
     - "spec/fixtures/**/*"
 
@@ -8,3 +8,15 @@ Style/StringLiterals:
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+Metrics/BlockLength:
+  # RSpec's describe/context/it DSL naturally produces long blocks; this is the
+  # standard exclusion used by rubocop-rspec's own default config. inherit_mode
+  # merges this onto (rather than replacing) RuboCop's own default Exclude list
+  # for this cop, which already exempts **/*.gemspec -- a plain `Exclude:` here
+  # would silently drop that default exemption and flag coatepec.gemspec.
+  inherit_mode:
+    merge:
+      - Exclude
+  Exclude:
+    - "spec/**/*_spec.rb"

@@ -6,6 +6,8 @@ require_relative "mcp/response"
 require_relative "mcp/tools"
 
 module Coatepec
+  # Wires the `rails_spec_run` and `rails_runtime_status` tools into an
+  # `::MCP::Server` instance backed by the given project's worker manager.
   module MCP
     def self.build_server(project:, worker_manager:)
       ::MCP::Server.new(

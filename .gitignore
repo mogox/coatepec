@@ -14,12 +14,12 @@
 /docs/superpowers/
 
 # Fixture Rails app runtime artifacts
-spec/fixtures/rails_app/tmp/
-spec/fixtures/rails_app/log/
-spec/fixtures/rails_app/.bundle/
-spec/fixtures/rails_app/storage/
+spec/fixtures/*/tmp/
+spec/fixtures/*/log/
+spec/fixtures/*/.bundle/
+spec/fixtures/*/storage/
 
 # Fixture Rails app secret key (rails new --skip-git does not generate its own
 # .gitignore, so this would otherwise be committed; standard Rails apps always
 # gitignore this file)
-spec/fixtures/rails_app/config/master.key
+spec/fixtures/*/config/master.key

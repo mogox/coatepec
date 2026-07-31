@@ -2,6 +2,9 @@
 
 module Coatepec
   module Worker
+    # The parent-process handle to a spawned test worker: owns its pipes,
+    # sends NDJSON requests with a response timeout, and detects when the
+    # worker has died.
     class Client
       class DisconnectedError < StandardError; end
 
@@ -18,12 +21,7 @@ module Coatepec
         to_worker_r, @to_worker_write = IO.pipe
         @from_worker_read, from_worker_w = IO.pipe
 
-        worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
-        @pid = Process.spawn(
-          { "BUNDLE_GEMFILE" => File.join(@project_root, "Gemfile") },
-          RbConfig.ruby, worker_exe, @project_root,
-          in: to_worker_r, out: from_worker_w, err: :err, chdir: @project_root
-        )
+        @pid = spawn_worker(to_worker_r, from_worker_w)
         to_worker_r.close
         from_worker_w.close
         @protocol = Protocol.new(input: @from_worker_read, output: @to_worker_write)
@@ -61,6 +59,15 @@ module Coatepec
       end
 
       private
+
+      def spawn_worker(to_worker_r, from_worker_w)
+        worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
+        Process.spawn(
+          { "BUNDLE_GEMFILE" => File.join(@project_root, "Gemfile") },
+          RbConfig.ruby, worker_exe, @project_root,
+          in: to_worker_r, out: from_worker_w, err: :err, chdir: @project_root
+        )
+      end
 
       def read_response(id, timeout)
         ready = IO.select([@from_worker_read], nil, nil, timeout)

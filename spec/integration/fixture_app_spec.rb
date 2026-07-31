@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe "fixture Rails app", type: :integration do
@@ -8,7 +10,7 @@ RSpec.describe "fixture Rails app", type: :integration do
     RUBY
 
     expect(status).to be_success, stderr
-    expect(stdout.strip).to eq("8.1.3.1")
+    expect(stdout.strip).to match(/\A(7\.1|8\.1)\./)
   end
 
   it "has passing and failing example specs available under spec/" do

@@ -16,5 +16,8 @@ require_relative "coatepec/spec/runner"
 require_relative "coatepec/worker/server"
 require_relative "coatepec/worker_manager"
 
+# Coatepec is a local stdio MCP sidecar that keeps an isolated Rails test
+# worker warm so coding agents can run targeted RSpec examples quickly,
+# without exposing a general Rails console.
 module Coatepec
 end

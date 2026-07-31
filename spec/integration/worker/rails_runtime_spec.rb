@@ -16,7 +16,7 @@ RSpec.describe Coatepec::Worker::RailsRuntime, type: :integration do
     expect(status).to be_success, stderr
     result = JSON.parse(stdout.lines.last)
 
-    expect(result["rails_version"]).to eq("8.1.3.1")
+    expect(result["rails_version"]).to match(/\A(7\.1|8\.1)\./)
     expect(result["environment"]).to eq("test")
     expect(result["pid"]).to be_a(Integer)
     expect(result["boot_id"]).to be_a(String)

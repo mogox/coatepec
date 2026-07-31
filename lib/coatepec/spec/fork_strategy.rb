@@ -2,6 +2,9 @@
 
 module Coatepec
   module Spec
+    # Runs RSpec in a `Process.fork`ed child (Linux only): cheap and reuses
+    # the warm worker's loaded Rails boot, but isolated from the parent's
+    # ActiveRecord connections and global state.
     class ForkStrategy < ProcessStrategy
       private
 
@@ -22,8 +25,8 @@ module Coatepec
       def redirect_output(out_w, err_w)
         $stdout.reopen(out_w)
         $stderr.reopen(err_w)
-        STDOUT.reopen(out_w)
-        STDERR.reopen(err_w)
+        $stdout.reopen(out_w)
+        $stderr.reopen(err_w)
       end
     end
   end

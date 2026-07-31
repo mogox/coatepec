@@ -4,20 +4,24 @@ require "spec_helper"
 
 RSpec.describe "coatepec-worker executable", type: :integration do
   def spawn_worker
-    worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
     lib_path = File.expand_path("../../../lib", __dir__)
     to_worker_r, to_worker_w = IO.pipe
     from_worker_r, from_worker_w = IO.pipe
 
-    pid = Process.spawn(
-      { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RUBYLIB" => lib_path },
-      RbConfig.ruby, worker_exe, FIXTURE_APP_ROOT,
-      in: to_worker_r, out: from_worker_w, err: :err, chdir: FIXTURE_APP_ROOT
-    )
+    pid = spawn_worker_process(lib_path, to_worker_r, from_worker_w)
     to_worker_r.close
     from_worker_w.close
 
     [pid, Coatepec::Protocol.new(input: from_worker_r, output: to_worker_w)]
+  end
+
+  def spawn_worker_process(lib_path, to_worker_r, from_worker_w)
+    worker_exe = File.expand_path("../../../exe/coatepec-worker", __dir__)
+    Process.spawn(
+      { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RUBYLIB" => lib_path },
+      RbConfig.ruby, worker_exe, FIXTURE_APP_ROOT,
+      in: to_worker_r, out: from_worker_w, err: :err, chdir: FIXTURE_APP_ROOT
+    )
   end
 
   after do
@@ -35,7 +39,7 @@ RSpec.describe "coatepec-worker executable", type: :integration do
 
     expect(response[:id]).to eq(1)
     expect(response[:ok]).to be(true)
-    expect(response[:data][:rails_version]).to eq("8.1.3.1")
+    expect(response[:data][:rails_version]).to match(/\A(7\.1|8\.1)\./)
     expect(response[:data][:environment]).to eq("test")
   end
 

@@ -2,6 +2,9 @@
 
 module Coatepec
   module Spec
+    # Validates a `rails_spec_run` request's paths, builds the RSpec CLI
+    # args, and delegates to the platform-appropriate process strategy
+    # (fork on Linux, spawn elsewhere).
     class Runner
       DEFAULT_TIMEOUT = 120
 
