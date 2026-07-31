@@ -7,6 +7,11 @@ require_relative "coatepec/spec/path_policy"
 require_relative "coatepec/protocol"
 require_relative "coatepec/worker/change_detector"
 require_relative "coatepec/worker/rails_runtime"
+require_relative "coatepec/spec/result"
+require_relative "coatepec/spec/process_strategy"
+require_relative "coatepec/spec/fork_strategy"
+require_relative "coatepec/spec/spawn_strategy"
+require_relative "coatepec/spec/runner"
 
 module Coatepec
 end
