@@ -22,12 +22,18 @@ module Coatepec
         end
       end
 
+      # rubocop:disable Style/GlobalStdStream -- exe/coatepec-worker aliases $stdout to
+      # $stderr so Rails boot output can't corrupt the NDJSON protocol on fd 1. That
+      # makes $stdout/$stderr the same object here, so only the STDOUT/STDERR
+      # constants can move the underlying fds -- and fd 1 must move off the
+      # protocol pipe.
       def redirect_output(out_w, err_w)
-        $stdout.reopen(out_w)
-        $stderr.reopen(err_w)
-        $stdout.reopen(out_w)
-        $stderr.reopen(err_w)
+        STDOUT.reopen(out_w)
+        STDERR.reopen(err_w)
+        $stdout = STDOUT
+        $stderr = STDERR
       end
+      # rubocop:enable Style/GlobalStdStream
     end
   end
 end

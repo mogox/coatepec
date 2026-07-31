@@ -51,6 +51,9 @@ RSpec.describe "coatepec-worker executable", type: :integration do
 
     expect(response[:ok]).to be(true)
     expect(response[:data][:status]).to eq("passed")
+    # The forked/spawned child's stdout must be captured on its own pipe, not
+    # swallowed into stderr or written onto the NDJSON protocol's fd 1.
+    expect(response[:data][:stdout]).to include("1 example, 0 failures")
   end
 
   it "answers with a structured error for an invalid spec path" do

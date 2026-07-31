@@ -28,6 +28,25 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     expect(result["summary"]["example_count"]).to eq(1)
     expect(result["summary"]["failure_count"]).to eq(0)
     expect(result["examples"].first["status"]).to eq("passed")
+    # Regression guard: RSpec's progress-formatter output must land on the
+    # child's *stdout* pipe, not leak into stderr or the protocol fd.
+    expect(result["stdout"]).to include("1 example, 0 failures")
+    expect(result["stdout_truncated"]).to be(false)
+  end
+
+  it "runs a spec that requires rails_helper against the warm Rails boot" do
+    stdout, stderr, status = run_in_worker(<<~RUBY)
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/rails_boot_spec.rb"])
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["status"]).to eq("passed"), result["stderr"]
+    expect(result["summary"]["example_count"]).to eq(2)
+    expect(result["summary"]["failure_count"]).to eq(0)
+    expect(result["stdout"]).to include("2 examples, 0 failures")
   end
 
   it "reports a failing run for a failing spec" do
