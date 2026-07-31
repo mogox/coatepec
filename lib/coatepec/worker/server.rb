@@ -39,7 +39,7 @@ module Coatepec
         when "status"
           @runtime.status
         when "spec_run"
-          Spec::Runner.new(@project_root).run(**args.transform_keys(&:to_sym))
+          Spec::Runner.new(@project_root, rails_runtime: @runtime).run(**args.transform_keys(&:to_sym))
         else
           raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
         end
