@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0
+
+- Add `rails_routes` and `rails_model` MCP tools: bounded, filterable route
+  listing and ActiveRecord schema/association/validator introspection,
+  both running synchronously in the existing warm test worker (no
+  fork/spawn). `rails_model` is restricted to `ActiveRecord::Base`
+  descendants, resolved only via `safe_constantize` against a validated
+  constant-name pattern -- no eval, no arbitrary method dispatch.
+- The warm worker now forces Rails' reload-checking on at boot (overriding
+  the target app's own `test.rb`, which disables it by default) and wraps
+  every dispatched command in `Rails.application.reloader.wrap`, so edited
+  model files no longer serve stale metadata without a worker restart.
+  Benefits `rails_runtime_status` and `rails_spec_run`'s fork path too.
+  Note that this applies process-wide: `rails_spec_run` also executes specs
+  under the forced `enable_reloading`/`cache_classes` settings rather than
+  the app's own `test.rb` values. The file watcher is pinned to the polling
+  `ActiveSupport::FileUpdateChecker` at the same time, so an app configuring
+  `ActiveSupport::EventedFileUpdateChecker` doesn't get `listen` threads
+  started inside the warm worker (and inside the fork guard's baseline).
+
 ## 0.2.0
 
 - Add an opt-in, guarded `Process.fork` strategy for macOS

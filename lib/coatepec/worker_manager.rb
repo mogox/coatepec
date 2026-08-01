@@ -28,6 +28,14 @@ module Coatepec
       )
     end
 
+    def routes(query: nil, limit: 50, offset: 0)
+      dispatch("routes", { query: query, limit: limit, offset: offset }, timeout: 30)
+    end
+
+    def model(name:)
+      dispatch("model", { name: name }, timeout: 30)
+    end
+
     def stop
       @lock.synchronize { @client&.stop }
     end
