@@ -80,14 +80,25 @@ module Coatepec
         Rails::Application::Configuration.prepend(reload_forcing_module)
       end
 
+      # `enable_reloading=` is overridden as the modern, documented setter.
+      # `cache_classes=` is also overridden because Rails' own
+      # `enable_reloading=` is implemented as `self.cache_classes = !value`
+      # (see railties' application/configuration.rb) with `cache_classes`
+      # remaining a plain attr_accessor underneath -- so a target app's
+      # config/environments/test.rb using the legacy `config.cache_classes =
+      # true` form would otherwise write that flag directly, bypassing the
+      # `enable_reloading=` override entirely and silently leaving reloading
+      # off.
       def reload_forcing_module
         Module.new do
-          def coatepec_forces_reloading?
-            true
-          end
+          def coatepec_forces_reloading? = true
 
           def enable_reloading=(_value)
             super(true)
+          end
+
+          def cache_classes=(_value)
+            super(false)
           end
         end
       end
