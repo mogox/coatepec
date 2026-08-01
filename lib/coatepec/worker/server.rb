@@ -35,16 +35,30 @@ module Coatepec
       end
 
       def dispatch(command, args)
-        Rails.application.reloader.wrap do
-          case command
-          when "status"
-            @runtime.status
-          when "spec_run"
-            Spec::Runner.new(@project_root, rails_runtime: @runtime).run(**args.transform_keys(&:to_sym))
-          else
-            raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
-          end
+        Rails.application.reloader.wrap { execute_command(command, args) }
+      end
+
+      def execute_command(command, args)
+        case command
+        when "status" then @runtime.status
+        when "spec_run" then handle_spec_run(args)
+        when "routes" then handle_routes(args)
+        when "model" then handle_model(args)
+        else
+          raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
         end
+      end
+
+      def handle_spec_run(args)
+        Spec::Runner.new(@project_root, rails_runtime: @runtime).run(**args.transform_keys(&:to_sym))
+      end
+
+      def handle_routes(args)
+        Introspection::Routes.new(**args.transform_keys(&:to_sym)).call
+      end
+
+      def handle_model(args)
+        Introspection::Model.new(args.transform_keys(&:to_sym)[:name]).call
       end
     end
   end

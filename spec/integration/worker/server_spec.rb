@@ -83,4 +83,36 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     expect(second[:ok]).to be(true)
     expect(second[:data][:boot_id]).to eq(first[:data][:boot_id])
   end
+
+  it "answers a routes command" do
+    @pid, protocol = spawn_worker
+
+    protocol.write(id: 1, command: "routes", args: { query: "widgets" })
+    response = protocol.read
+
+    expect(response[:ok]).to be(true)
+    expect(response[:data][:items]).not_to be_empty
+    expect(response[:data][:items].first[:controller]).to eq("widgets")
+  end
+
+  it "answers a model command" do
+    @pid, protocol = spawn_worker
+
+    protocol.write(id: 1, command: "model", args: { name: "Widget" })
+    response = protocol.read
+
+    expect(response[:ok]).to be(true)
+    expect(response[:data][:name]).to eq("Widget")
+    expect(response[:data][:columns]).not_to be_empty
+  end
+
+  it "answers with a structured error for an invalid model name" do
+    @pid, protocol = spawn_worker
+
+    protocol.write(id: 1, command: "model", args: { name: "not_a_constant" })
+    response = protocol.read
+
+    expect(response[:ok]).to be(false)
+    expect(response[:error][:code]).to eq("invalid_model_name")
+  end
 end
