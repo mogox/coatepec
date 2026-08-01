@@ -56,6 +56,45 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(length_validator["options"]).not_to have_key("if")
   end
 
+  it "keeps a Symbol array option (e.g. `in:`) as an array of strings" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("Owner").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # The fixture declares `validates :name, exclusion: { in: %i[admin root] }`.
+    # A bare Symbol option value is already stringified, so a Symbol *array*
+    # must be too -- otherwise the `in:` key vanishes entirely, which is what
+    # `inclusion:`/`exclusion:`/`in:` looks like for most real Rails apps.
+    in_validator = result["validators"].find { |v| v["options"].key?("in") }
+    expect(in_validator).not_to be_nil
+    expect(in_validator["options"]["in"]).to eq(%w[admin root])
+  end
+
+  it "raises table_not_found for a concrete model whose table does not exist" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      class GhostRecord < ActiveRecord::Base
+        self.table_name = "does_not_exist"
+      end
+
+      begin
+        Coatepec::Introspection::Model.new("GhostRecord").call
+        puts JSON.generate(error: nil)
+      rescue Coatepec::Error => e
+        puts JSON.generate(error: e.code.to_s, message: e.message)
+      end
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["error"]).to eq("table_not_found")
+    expect(result["message"]).to include("does_not_exist")
+  end
+
   it "returns nil class_name for a real polymorphic belongs_to instead of crashing" do
     stdout, stderr, status = run_model_call(<<~RUBY)
       result = Coatepec::Introspection::Model.new("Note").call

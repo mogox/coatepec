@@ -9,6 +9,7 @@ module Coatepec
     class Model
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
+      EMPTY_TABLE_METADATA = { table_name: nil, primary_key: nil, columns: [] }.freeze
 
       def initialize(name)
         @name = name
@@ -33,15 +34,33 @@ module Coatepec
         # nil (not false) in that case, while Rails 8.1 returns false.
         # Normalize to a genuine Boolean so JSON output is version-stable.
         abstract = klass.abstract_class? || false
+        table = abstract ? EMPTY_TABLE_METADATA : table_metadata(klass)
         {
-          name: klass.name,
-          table_name: abstract ? nil : klass.table_name,
-          primary_key: abstract ? nil : klass.primary_key,
-          abstract_class: abstract,
-          columns: abstract ? [] : columns_for(klass),
+          name: klass.name, table_name: table[:table_name], primary_key: table[:primary_key],
+          abstract_class: abstract, columns: table[:columns],
           associations: abstract ? [] : associations_for(klass),
           validators: validators_for(klass)
         }
+      end
+
+      # A concrete model can still name a table that isn't there: a checkout
+      # whose test database is behind on migrations, a view-backed model, a
+      # model living in a database this process isn't connected to. That is
+      # deliberately *not* folded into the abstract-class handling above --
+      # an abstract class declares "I have no table", so empty column data is
+      # the truthful answer for it, whereas a missing table is a real
+      # mismatch the caller needs told about. Reporting it as a table with
+      # zero columns would read as "this model has no columns", which is a
+      # lie. It gets its own structured code instead of escaping as the
+      # server's catch-all :internal_error. The exception's own message is
+      # not interpolated: it carries driver-specific SQL text.
+      def table_metadata(klass)
+        { table_name: klass.table_name, primary_key: klass.primary_key, columns: columns_for(klass) }
+      rescue ::ActiveRecord::StatementInvalid
+        raise Coatepec::Error.new(
+          :table_not_found,
+          "#{@name}'s table (#{klass.table_name}) does not exist or could not be read"
+        )
       end
 
       def validate_name!
@@ -125,8 +144,20 @@ module Coatepec
         when Symbol
           value.to_s
         when Array
-          value.all? { |v| v.is_a?(String) || v.is_a?(Numeric) } ? value : nil
+          safe_array_value(value)
         end
+      end
+
+      # Symbol *elements* are stringified exactly as a bare Symbol value is
+      # above: `inclusion: { in: %i[draft published] }` is one of the most
+      # common option shapes in Rails, and dropping the whole `in:` key for it
+      # while keeping the single-Symbol equivalent would be arbitrary. An
+      # array still holding anything non-primitive after that is dropped
+      # whole -- a mixed array's non-primitive members can't be silently
+      # elided without misrepresenting the option.
+      def safe_array_value(value)
+        stringified = value.map { |element| element.is_a?(Symbol) ? element.to_s : element }
+        stringified.all? { |element| element.is_a?(String) || element.is_a?(Numeric) } ? stringified : nil
       end
     end
   end

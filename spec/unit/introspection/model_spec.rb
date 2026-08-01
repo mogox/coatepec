@@ -101,6 +101,11 @@ RSpec.describe Coatepec::Introspection::Model do
     it "drops an Array containing non-primitive elements" do
       expect(model.send(:safe_option_value, [1, -> { true }])).to be_nil
     end
+
+    it "stringifies Symbol elements inside an Array (e.g. `inclusion: { in: %i[...] }`)" do
+      expect(model.send(:safe_option_value, %i[draft published])).to eq(%w[draft published])
+      expect(model.send(:safe_option_value, [:draft, "published", 3])).to eq(["draft", "published", 3])
+    end
   end
 
   describe "#build_association_data (private, unit-level)" do
