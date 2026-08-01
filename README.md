@@ -21,6 +21,28 @@ bundle exec coatepec --version
 Configure your MCP client to run `bundle exec coatepec --root /absolute/path/to/app`
 from the Rails application's own bundle.
 
+With the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code),
+from the Rails app's own root:
+
+```bash
+claude mcp add coatepec --scope project -- bundle exec coatepec --root .
+```
+
+That writes a project-scoped `.mcp.json` you can commit so the whole team
+gets it. For any other MCP-compatible client, or to write it by hand, the
+same thing looks like:
+
+```json
+{
+  "mcpServers": {
+    "coatepec": {
+      "command": "bundle",
+      "args": ["exec", "coatepec", "--root", "."]
+    }
+  }
+}
+```
+
 ## Architecture
 
 ```text
@@ -101,6 +123,26 @@ selectors must resolve inside an allowed spec root (`spec/`, `packs/*/spec/`,
 non-`_spec.rb` files, and more than 100 selectors are rejected. RSpec still
 executes application-controlled code; only run Coatepec against a trusted
 checkout.
+
+### Compared to Rails Active MCP
+
+[Rails Active MCP](https://github.com/GoodPie/rails-active-mcp) is a
+different MCP server for Rails apps built around a `console_execute` tool:
+arbitrary Ruby runs in your Rails console, gated by pattern-based
+"dangerous operation" detection (blocking things like mass deletions,
+`eval`, or raw SQL) rather than by not offering code execution at all --
+sophisticated bypasses of a denylist like that are always possible in
+principle.
+
+Coatepec takes the opposite approach: there's no eval, console, or SQL
+tool to begin with. `rails_spec_run` only ever executes RSpec files that
+already exist under the app's own allowed spec roots, and `rails_routes`/
+`rails_model` only ever call structured, read-only Rails APIs
+(`Rails.application.routes.routes`, `ActiveRecord` reflection) -- never
+`eval`, `const_get` on unvalidated input, or arbitrary method dispatch. If
+you genuinely need a Rails console over MCP, Rails Active MCP is built for
+that; Coatepec is for teams who want an agent to run specs and read
+structure without ever handing it a REPL.
 
 ## Compatibility
 
