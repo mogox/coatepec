@@ -3,6 +3,14 @@
 require "spec_helper"
 require "coatepec/introspection/model"
 
+# Coatepec::Introspection::Model#resolve! calls ::ActiveSupport::Inflector
+# directly, relying on Rails already being booted by the time it's actually
+# invoked in this gem's real architecture (see model.rb for the full
+# rationale). The examples below deliberately call #resolve! without
+# booting Rails, so this file -- and only this file -- needs to load that
+# one piece of ActiveSupport itself to exercise that path in isolation.
+require "active_support/inflector"
+
 RSpec.describe Coatepec::Introspection::Model do
   describe "name validation" do
     it "raises invalid_model_name for a lowercase-starting name" do

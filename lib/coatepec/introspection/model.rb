@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "active_support/inflector"
-
 module Coatepec
   module Introspection
     # Returns bounded ActiveRecord schema and class metadata for a single
