@@ -28,7 +28,11 @@ module Coatepec
       # report empty/nil table data instead of crashing. Validators aren't
       # table-dependent, so those are always attempted.
       def build_metadata(klass)
-        abstract = klass.abstract_class?
+        # abstract_class? is a plain attr_accessor-backed predicate that is
+        # never assigned on concrete subclasses -- on Rails 7.1 it returns
+        # nil (not false) in that case, while Rails 8.1 returns false.
+        # Normalize to a genuine Boolean so JSON output is version-stable.
+        abstract = klass.abstract_class? || false
         {
           name: klass.name,
           table_name: abstract ? nil : klass.table_name,

@@ -23,6 +23,10 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     result = JSON.parse(stdout.lines.last)
 
     expect(result["name"]).to eq("Widget")
+    # Must be a genuine `false`, not `nil` -- ActiveRecord::Base#abstract_class?
+    # returns nil (not false) for concrete classes on Rails 7.1, but false on
+    # Rails 8.1, so this has to be normalized in build_metadata.
+    expect(result["abstract_class"]).to eq(false)
     expect(result["columns"].map { |c| c["name"] }).to include("name", "sku", "active", "owner_id")
     owner_assoc = result["associations"].find { |a| a["name"] == "owner" }
     expect(owner_assoc["macro"]).to eq("belongs_to")
