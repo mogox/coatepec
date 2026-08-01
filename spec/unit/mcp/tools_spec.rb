@@ -43,11 +43,59 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
-  it "registers both tools on a built server" do
+  describe Coatepec::MCP::RoutesTool do
+    it "returns an ok envelope with the routes data" do
+      allow(worker_manager).to receive(:routes)
+        .with(query: "widgets", limit: 50, offset: 0)
+        .and_return(items: [], matched: 0, limit: 50, offset: 0)
+
+      response = described_class.call(query: "widgets", limit: 50, offset: 0, server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"]).to eq("items" => [], "matched" => 0, "limit" => 50, "offset" => 0)
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:routes).and_raise(Coatepec::Error.new(:worker_disconnected, "gone"))
+
+      response = described_class.call(query: nil, limit: 50, offset: 0, server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("worker_disconnected")
+    end
+  end
+
+  describe Coatepec::MCP::ModelTool do
+    it "returns an ok envelope with the model data" do
+      allow(worker_manager).to receive(:model).with(name: "Widget").and_return(name: "Widget", columns: [])
+
+      response = described_class.call(name: "Widget", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"]).to eq("name" => "Widget", "columns" => [])
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:model).and_raise(Coatepec::Error.new(:invalid_model_name, "bad"))
+
+      response = described_class.call(name: "bad name", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("invalid_model_name")
+    end
+  end
+
+  it "registers all tools on a built server" do
     project = instance_double(Coatepec::Project, root: "/app")
     server = Coatepec::MCP.build_server(project: project, worker_manager: worker_manager)
 
-    expect(server.tools.keys).to contain_exactly("rails_spec_run", "rails_runtime_status")
+    expect(server.tools.keys).to contain_exactly(
+      "rails_spec_run", "rails_runtime_status", "rails_routes", "rails_model"
+    )
   end
 
   describe "input schema strictness" do

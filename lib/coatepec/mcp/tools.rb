@@ -68,5 +68,71 @@ module Coatepec
         end
       end
     end
+
+    # The `rails_routes` MCP tool: lists/filters/paginates the target
+    # Rails app's routes.
+    class RoutesTool < ::MCP::Tool
+      tool_name "rails_routes"
+      description "Return a bounded, filterable list of the Rails app's routes"
+      annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
+      input_schema(
+        properties: {
+          query: { type: %w[string null] },
+          limit: { type: "integer", minimum: 1, maximum: 200 },
+          offset: { type: "integer", minimum: 0 }
+        },
+        required: [],
+        additionalProperties: false
+      )
+
+      class << self
+        def call(server_context:, query: nil, limit: 50, offset: 0)
+          started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset)
+          Response.ok(data: data, meta: meta_for(server_context, started_at))
+        rescue Coatepec::Error => e
+          Response.error(e)
+        end
+
+        private
+
+        def meta_for(server_context, started_at)
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
+        end
+      end
+    end
+
+    # The `rails_model` MCP tool: returns an ActiveRecord model's schema,
+    # associations, and validators.
+    class ModelTool < ::MCP::Tool
+      tool_name "rails_model"
+      description "Return bounded ActiveRecord schema and class metadata for a model, without row data"
+      annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
+      input_schema(
+        properties: {
+          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' }
+        },
+        required: ["name"],
+        additionalProperties: false
+      )
+
+      class << self
+        def call(name:, server_context:)
+          started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          data = server_context[:worker_manager].model(name: name)
+          Response.ok(data: data, meta: meta_for(server_context, started_at))
+        rescue Coatepec::Error => e
+          Response.error(e)
+        end
+
+        private
+
+        def meta_for(server_context, started_at)
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
+        end
+      end
+    end
   end
 end
