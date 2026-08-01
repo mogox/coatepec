@@ -49,4 +49,25 @@ RSpec.describe Coatepec::Worker::RailsRuntime, type: :integration do
 
     expect { runtime.boot! }.to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:worker_failure) }
   end
+
+  it "boots with a real, migrated Widget/Owner fixture model available" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
+      puts JSON.generate(
+        widget_columns: Widget.column_names.sort,
+        widget_belongs_to_owner: Widget.reflect_on_association(:owner).macro.to_s,
+        owner_has_many_widgets: Owner.reflect_on_association(:widgets).macro.to_s
+      )
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["widget_columns"]).to include("name", "sku", "active", "owner_id")
+    expect(result["widget_belongs_to_owner"]).to eq("belongs_to")
+    expect(result["owner_has_many_widgets"]).to eq("has_many")
+  end
 end

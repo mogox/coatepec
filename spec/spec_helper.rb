@@ -14,6 +14,24 @@ ENV["RUBYLIB"] = File.expand_path("../lib", __dir__)
 
 Dir[File.join(__dir__, "support/**/*.rb")].sort.each { |f| require f }
 
+# Integration specs need the fixture app's test database migrated with this
+# project's fixture schema (the Owner/Widget models Coatepec introspects).
+# Guarded on file existence so unit specs (which never boot Rails) don't pay
+# any subprocess cost on a checkout that already has it, and a fresh CI
+# checkout -- which only ever gets db/schema.rb from git, never the
+# gitignored .sqlite3 file itself -- gets it prepared automatically, whether
+# rspec was invoked via `rake` or directly (both paths load this file).
+db_path = File.join(FIXTURE_APP_ROOT, "storage/test.sqlite3")
+unless File.exist?(db_path)
+  Bundler.with_unbundled_env do
+    system(
+      { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RAILS_ENV" => "test" },
+      "bundle", "exec", "rails", "db:schema:load",
+      chdir: FIXTURE_APP_ROOT, out: File::NULL, err: File::NULL, exception: true
+    )
+  end
+end
+
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
