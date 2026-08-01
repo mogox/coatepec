@@ -78,6 +78,7 @@ module Coatepec
         return if Rails::Application::Configuration.method_defined?(:coatepec_forces_reloading?)
 
         Rails::Application::Configuration.prepend(reload_forcing_module)
+        Rails::Application::Configuration.prepend(file_watcher_forcing_module)
       end
 
       # `enable_reloading=` is overridden as the modern, documented setter.
@@ -99,6 +100,28 @@ module Coatepec
 
           def cache_classes=(_value)
             super(false)
+          end
+        end
+      end
+
+      # Consequence of the override above, and prepended alongside it: with
+      # reloading on, Rails' own finisher now instantiates
+      # `config.file_watcher` -- something that never happened in this process
+      # while the test env kept reloading off. The default
+      # `ActiveSupport::FileUpdateChecker` polls on the calling thread and is
+      # fork-safe, but a target app configuring
+      # `ActiveSupport::EventedFileUpdateChecker` would instead spawn `listen`
+      # background threads *during boot* in the warm worker. On macOS those
+      # are exactly the ObjC-initializing threads GuardedForkStrategy exists
+      # to keep out of a fork -- and because they'd start before
+      # #post_boot_thread_count is sampled, they'd be baked into the guard's
+      # own baseline and sail through its thread-count check unnoticed. So the
+      # watcher is pinned to the polling implementation regardless of what the
+      # app asks for.
+      def file_watcher_forcing_module
+        Module.new do
+          def file_watcher=(_value)
+            super(::ActiveSupport::FileUpdateChecker)
           end
         end
       end

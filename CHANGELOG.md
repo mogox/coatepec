@@ -13,6 +13,12 @@
   every dispatched command in `Rails.application.reloader.wrap`, so edited
   model files no longer serve stale metadata without a worker restart.
   Benefits `rails_runtime_status` and `rails_spec_run`'s fork path too.
+  Note that this applies process-wide: `rails_spec_run` also executes specs
+  under the forced `enable_reloading`/`cache_classes` settings rather than
+  the app's own `test.rb` values. The file watcher is pinned to the polling
+  `ActiveSupport::FileUpdateChecker` at the same time, so an app configuring
+  `ActiveSupport::EventedFileUpdateChecker` doesn't get `listen` threads
+  started inside the warm worker (and inside the fork guard's baseline).
 
 ## 0.2.0
 

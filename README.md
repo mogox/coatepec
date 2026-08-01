@@ -83,7 +83,15 @@ under `crashed_fork_stderr` so the crash can be diagnosed.
 The warm test worker forces Rails' reload-checking on for its own boot,
 regardless of the target app's own `test.rb` setting (which disables it by
 default) -- so editing a model file takes effect on the next tool call
-without needing to restart Coatepec.
+without needing to restart Coatepec. This is not limited to metadata reads:
+because the setting is applied to the whole worker process, `rails_spec_run`
+also executes your specs with `enable_reloading = true` and `cache_classes =
+false` rather than whatever your own `config/environments/test.rb` asks for
+(the file watcher is additionally pinned to the polling
+`ActiveSupport::FileUpdateChecker`, so no `listen` threads are started in the
+worker). For most apps this is invisible, but if you ever see behavior differ
+between Coatepec and your own `bundle exec rspec`, this is the first thing to
+suspect.
 
 ## Security boundary
 
