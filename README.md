@@ -77,6 +77,13 @@ under `crashed_fork_stderr` so the crash can be diagnosed.
 |---|---|---|
 | `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | Isolated per run; output capped at 256 KiB per stream |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
+| `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators -- no row data |
+
+The warm test worker forces Rails' reload-checking on for its own boot,
+regardless of the target app's own `test.rb` setting (which disables it by
+default) -- so editing a model file takes effect on the next tool call
+without needing to restart Coatepec.
 
 ## Security boundary
 
@@ -91,7 +98,7 @@ checkout.
 
 Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`. CI tests three lanes: Rails 8.1 on
 Linux (primary), Rails 7.1 on Linux (compat), and Rails 8.1 on macOS (which
-is where the guarded-fork path below actually forks).
+is where the guarded-fork path above actually forks).
 
 ## Development
 
