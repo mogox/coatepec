@@ -31,6 +31,58 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(name_validator).not_to be_nil
   end
 
+  it "keeps primitive validator options but drops non-primitive ones (e.g. Proc for if:)" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("Owner").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # The validator class's exact namespace (ActiveModel:: vs. ActiveRecord::)
+    # varies across Rails versions, so key off its options instead.
+    length_validator = result["validators"].find { |v| v["attributes"] == ["name"] && v["options"].key?("minimum") }
+    expect(length_validator).not_to be_nil
+    # Plain-value options (Integer) survive.
+    expect(length_validator["options"]["minimum"]).to eq(1)
+    # The fixture declares `if: -> { true }` on this validator -- a Proc,
+    # whose #to_s would otherwise leak this fixture app's absolute source
+    # path and line number into the output. It must not appear at all.
+    expect(length_validator["options"]).not_to have_key("if")
+  end
+
+  it "returns nil class_name for a real polymorphic belongs_to instead of crashing" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("Note").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    notable_assoc = result["associations"].find { |a| a["name"] == "notable" }
+    expect(notable_assoc).not_to be_nil
+    expect(notable_assoc["polymorphic"]).to eq(true)
+    expect(notable_assoc["class_name"]).to be_nil
+  end
+
+  it "returns empty/nil table data for an abstract class instead of crashing" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("ApplicationRecord").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["abstract_class"]).to eq(true)
+    expect(result["table_name"]).to be_nil
+    expect(result["primary_key"]).to be_nil
+    expect(result["columns"]).to eq([])
+    expect(result["associations"]).to eq([])
+  end
+
   it "raises not_active_record_model for a real, non-AR project constant" do
     stdout, stderr, status = run_model_call(<<~RUBY)
       begin
