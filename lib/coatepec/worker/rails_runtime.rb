@@ -77,7 +77,11 @@ module Coatepec
         require "rails"
         return if Rails::Application::Configuration.method_defined?(:coatepec_forces_reloading?)
 
-        Rails::Application::Configuration.prepend(Module.new do
+        Rails::Application::Configuration.prepend(reload_forcing_module)
+      end
+
+      def reload_forcing_module
+        Module.new do
           def coatepec_forces_reloading?
             true
           end
@@ -85,7 +89,7 @@ module Coatepec
           def enable_reloading=(_value)
             super(true)
           end
-        end)
+        end
       end
 
       def record_boot!(started_at)
