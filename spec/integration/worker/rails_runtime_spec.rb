@@ -70,4 +70,41 @@ RSpec.describe Coatepec::Worker::RailsRuntime, type: :integration do
     expect(result["widget_belongs_to_owner"]).to eq("belongs_to")
     expect(result["owner_has_many_widgets"]).to eq("has_many")
   end
+
+  it "picks up an edited model's Ruby-defined metadata without a worker restart" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    widget_path = File.join(FIXTURE_APP_ROOT, "app/models/widget.rb")
+    original = File.read(widget_path)
+
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
+
+      before_validators = Widget.validators.map { |v| v.class.name }.sort
+
+      File.write(#{widget_path.inspect}, File.read(#{widget_path.inspect}).sub(
+        "validates :name, presence: true",
+        "validates :name, presence: true\n  validates :sku, presence: true"
+      ))
+      sleep 1 # file mtime resolution on some filesystems is 1-second granular
+
+      Rails.application.reloader.wrap {}
+
+      after_validators = Object.const_get(:Widget).validators.map { |v| v.class.name }.sort
+      puts JSON.generate(before: before_validators, after: after_validators)
+    RUBY
+
+    File.write(widget_path, original)
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # Widget already carries 2 validators before any edit: the explicit
+    # `validates :name, presence: true` plus the presence validator Rails
+    # auto-adds for `belongs_to :owner` under `config.load_defaults` (true by
+    # default since Rails 5). The edit below adds a third, on :sku.
+    expect(result["before"].size).to eq(2)
+    expect(result["after"].size).to eq(3)
+  end
 end

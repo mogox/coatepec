@@ -22,6 +22,7 @@ module Coatepec
       def boot!
         started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         ENV["RAILS_ENV"] = "test"
+        force_reloading!
         require File.join(@project_root, "config/environment")
         record_boot!(started_at)
       rescue Coatepec::Error
@@ -51,6 +52,41 @@ module Coatepec
       end
 
       private
+
+      # Rails' test environment disables reloading by default, and Zeitwerk
+      # refuses to enable reloading on a loader that's already had #setup
+      # called on it -- which happens automatically, deep inside
+      # Rails.application.initialize!, before any of our own code can run.
+      # The only window to influence this is before the target app's own
+      # config/environment.rb executes: intercept the config setter itself,
+      # so whatever the app's test.rb assigns, reloading still ends up on.
+      #
+      # `require "bundler/setup"` here (before `require "rails"`) is
+      # necessary, not optional: without it, `require "rails"` resolves
+      # whatever Rails version RubyGems activates by default -- not
+      # necessarily the one pinned by the target app's own Gemfile.lock --
+      # and once the wrong version's gems are activated process-wide, the
+      # target app's own later `require "bundler/setup"` (in its
+      # config/boot.rb) raises a Gem::LoadError version conflict instead of
+      # silently no-oping. BUNDLE_GEMFILE is already set to the target app's
+      # Gemfile by the caller (Worker::Client's spawn env) before this
+      # process starts, so this activates the correct version and the app's
+      # own later Bundler.setup call is simply a no-op.
+      def force_reloading!
+        require "bundler/setup"
+        require "rails"
+        return if Rails::Application::Configuration.method_defined?(:coatepec_forces_reloading?)
+
+        Rails::Application::Configuration.prepend(Module.new do
+          def coatepec_forces_reloading?
+            true
+          end
+
+          def enable_reloading=(_value)
+            super(true)
+          end
+        end)
+      end
 
       def record_boot!(started_at)
         @pid = Process.pid
