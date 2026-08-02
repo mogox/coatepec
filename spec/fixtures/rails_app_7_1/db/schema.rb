@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_01_000002) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_02_000001) do
   create_table "notes", force: :cascade do |t|
     t.string "body"
     t.string "notable_type", null: false
@@ -33,6 +33,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_01_000002) do
     t.integer "owner_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "status", default: 0, null: false
     t.index ["owner_id"], name: "index_widgets_on_owner_id"
   end
 

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    coatepec (0.3.0)
+    coatepec (0.4.0)
       mcp (~> 1.0)
       railties (>= 7.1, < 8.2)
 

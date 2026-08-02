@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Add `enums` to `rails_model`'s output, sourced from ActiveRecord's own
+  `defined_enums` API (pure in-memory, no DB query, no eval). Attempted
+  unconditionally, unlike `columns`/`associations`, since enum declarations
+  don't need a real table.
+
 ## 0.3.0
 
 - Add `rails_routes` and `rails_model` MCP tools: bounded, filterable route

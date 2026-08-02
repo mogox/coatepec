@@ -33,6 +33,8 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(owner_assoc["class_name"]).to eq("Owner")
     name_validator = result["validators"].find { |v| v["attributes"] == ["name"] }
     expect(name_validator).not_to be_nil
+    status_enum = result["enums"].find { |e| e["name"] == "status" }
+    expect(status_enum["values"]).to eq({ "draft" => 0, "published" => 1 })
   end
 
   it "keeps primitive validator options but drops non-primitive ones (e.g. Proc for if:)" do
@@ -124,6 +126,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(result["primary_key"]).to be_nil
     expect(result["columns"]).to eq([])
     expect(result["associations"]).to eq([])
+    expect(result["enums"]).to eq([])
   end
 
   it "raises not_active_record_model for a real, non-AR project constant" do
