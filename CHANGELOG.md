@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `enums` to `rails_model`'s output, sourced from ActiveRecord's own `defined_enums` API.
+
 ## 0.3.0
 
 - Add `rails_routes` and `rails_model` MCP tools: bounded, filterable route

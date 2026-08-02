@@ -6,6 +6,10 @@ module Coatepec
     # model, for the rails_model MCP tool. No records, no SQL beyond schema
     # reflection, no method dispatch on the resolved class beyond pure
     # introspection APIs.
+    # rubocop:disable Metrics/ClassLength -- flat list of small, single-purpose
+    # private methods, one per metadata facet (columns, associations,
+    # validators, enums); splitting it into multiple classes would scatter
+    # closely related metadata-building logic for no readability gain.
     class Model
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
@@ -39,7 +43,12 @@ module Coatepec
           name: klass.name, table_name: table[:table_name], primary_key: table[:primary_key],
           abstract_class: abstract, columns: table[:columns],
           associations: abstract ? [] : associations_for(klass),
-          validators: validators_for(klass)
+          validators: validators_for(klass),
+          # enum declarations are pure in-memory class metadata (populated
+          # when the `enum` macro runs in the class body) -- unlike columns
+          # and associations, they need no DB connection or real table, so
+          # this is attempted unconditionally, the same way validators are.
+          enums: enums_for(klass)
         }
       end
 
@@ -125,6 +134,12 @@ module Coatepec
         end
       end
 
+      def enums_for(klass)
+        klass.defined_enums.first(MAX_ITEMS).map do |name, values|
+          { name: name, values: values.first(MAX_ITEMS).to_h }
+        end
+      end
+
       def safe_options(options)
         options.filter_map do |key, value|
           safe_value = safe_option_value(value)
@@ -160,5 +175,6 @@ module Coatepec
         stringified.all? { |element| element.is_a?(String) || element.is_a?(Numeric) } ? stringified : nil
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
