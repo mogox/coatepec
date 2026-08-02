@@ -104,10 +104,11 @@ module Coatepec
     end
 
     # The `rails_model` MCP tool: returns an ActiveRecord model's schema,
-    # associations, and validators.
+    # associations, validators, and enums.
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
-      description "Return bounded ActiveRecord schema and class metadata for a model, without row data"
+      description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
+                  "without row data"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

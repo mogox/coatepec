@@ -126,6 +126,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(result["primary_key"]).to be_nil
     expect(result["columns"]).to eq([])
     expect(result["associations"]).to eq([])
+    expect(result["enums"]).to eq([])
   end
 
   it "raises not_active_record_model for a real, non-AR project constant" do

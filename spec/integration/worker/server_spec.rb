@@ -104,6 +104,13 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     expect(response[:ok]).to be(true)
     expect(response[:data][:name]).to eq("Widget")
     expect(response[:data][:columns]).not_to be_empty
+    # enums[].values' keys are data-driven (enum label strings from the
+    # target app's own code), unlike every other field here, which is keyed
+    # off a fixed schema-defined name (e.g. column.name). This is the field
+    # that actually exercises Protocol#read's symbolize_names: true behavior
+    # across the real NDJSON round-trip.
+    status_enum = response[:data][:enums].find { |e| e[:name] == "status" }
+    expect(status_enum[:values]).to eq(draft: 0, published: 1)
   end
 
   it "answers with a structured error for an invalid model name" do
