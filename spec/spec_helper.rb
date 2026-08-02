@@ -21,8 +21,17 @@ Dir[File.join(__dir__, "support/**/*.rb")].sort.each { |f| require f }
 # checkout -- which only ever gets db/schema.rb from git, never the
 # gitignored .sqlite3 file itself -- gets it prepared automatically, whether
 # rspec was invoked via `rake` or directly (both paths load this file).
+# Reloads whenever `db/schema.rb` is newer than the database file, not just when the file is
+# missing entirely, so a `git pull` that changes the schema doesn't silently leave a stale local
+# database in place.
+
+def fixture_db_needs_reload?(db_path, schema_path)
+  !File.exist?(db_path) || File.mtime(schema_path) > File.mtime(db_path)
+end
+
 db_path = File.join(FIXTURE_APP_ROOT, "storage/test.sqlite3")
-unless File.exist?(db_path)
+schema_path = File.join(FIXTURE_APP_ROOT, "db/schema.rb")
+if fixture_db_needs_reload?(db_path, schema_path)
   Bundler.with_unbundled_env do
     system(
       { "BUNDLE_GEMFILE" => File.join(FIXTURE_APP_ROOT, "Gemfile"), "RAILS_ENV" => "test" },
