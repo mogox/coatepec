@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1
+
+- Fix `exe/coatepec-worker` booting against a target app whose locally
+  installed default-gem versions (e.g. `json`) differ from what its
+  `Gemfile.lock` pins: `require "bundler/setup"` now runs before
+  `require "coatepec"` itself, so Bundler can pin default gems before
+  Ruby auto-activates a newer locally installed version and locks it in
+  for the rest of the process. Previously this broke every coatepec call
+  against such an app with `already activated X, but your Gemfile
+  requires Y`.
+
 ## 0.4.0
 
 - Add `enums` to `rails_model`'s output, sourced from ActiveRecord's own

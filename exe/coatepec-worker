@@ -1,6 +1,20 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Must run before any other require, including "coatepec" itself. Ruby
+# auto-activates the newest installed version of a default gem (json,
+# among others) the moment anything requires it, and a gem version can't
+# be changed once activated -- so if that happens before Bundler pins
+# versions to what the target app's Gemfile.lock actually specifies,
+# Bundler.setup then fails with "already activated X, but your Gemfile
+# requires Y" for any default gem that happens to have a newer version
+# installed locally than what's locked. require "coatepec" below pulls in
+# "json" (via protocol.rb) as its very first transitive require, so it's
+# exactly the kind of require this has to run ahead of.
+# Worker::Client#spawn_worker already sets BUNDLE_GEMFILE to the target
+# app's Gemfile before this process starts.
+require "bundler/setup"
+
 require "coatepec"
 
 # Preserve a real handle to the OS stdout fd for the private NDJSON
