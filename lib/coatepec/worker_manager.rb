@@ -68,7 +68,10 @@ module Coatepec
       reason = @change_detector.restart_reason(@snapshot)
       case reason
       when :sidecar_restart_required
-        raise Coatepec::Error.new(:sidecar_restart_required, "Gemfile changed; restart Coatepec")
+        raise Coatepec::Error.new(
+          :sidecar_restart_required,
+          "Gemfile changed; restart your MCP client to restart Coatepec and pick up the change"
+        )
       when :worker_restart_required
         restart_worker!
       end

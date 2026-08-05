@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
-require "mcp"
+begin
+  require "mcp"
+rescue LoadError
+  raise LoadError, "The \"mcp\" gem is required to run Coatepec but is not installed. " \
+    "Install it alongside Coatepec: `gem install coatepec mcp`."
+end
+
 require "coatepec"
 require_relative "mcp/response"
 require_relative "mcp/tools"

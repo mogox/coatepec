@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+- **Breaking:** `mcp` is no longer a runtime dependency of the `coatepec`
+  gem -- it's a development dependency, since Coatepec is meant to be
+  installed once outside any Rails app's own bundle and pointed at the app
+  via `--root`, not added to the app's `Gemfile` (`Worker::Client` resolves
+  the worker's `RUBYLIB` from Coatepec's own installation regardless).
+  Anyone whose MCP config currently launches Coatepec with `bundle exec
+  coatepec` from inside a target app's bundle will hit a `LoadError` on
+  upgrade once that bundle no longer pulls in `mcp` transitively.
+
+  **Migration:** `gem install mcp` alongside `coatepec`, and change your MCP
+  client config to invoke `coatepec` directly rather than `bundle exec
+  coatepec` (drop the `coatepec` line from the target app's `Gemfile` too,
+  if present -- see the README Quickstart for the corrected install story).
+
 ## 0.4.1
 
 - Fix `exe/coatepec-worker` booting against a target app whose locally
