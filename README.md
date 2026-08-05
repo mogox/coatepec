@@ -6,26 +6,31 @@ console.
 
 ## Quickstart
 
-```ruby
-# Gemfile
-group :development, :test do
-  gem "coatepec", require: false
-end
-```
+Coatepec is installed once, outside of any Rails app's own bundle, and
+points at the app via `--root`:
 
 ```bash
-bundle install
-bundle exec coatepec --version
+gem install coatepec mcp
+coatepec --version
 ```
 
-Configure your MCP client to run `bundle exec coatepec --root /absolute/path/to/app`
-from the Rails application's own bundle.
+Do not add `coatepec` to the target app's `Gemfile`. `Worker::Client#spawn_worker`
+resolves both the worker executable and its `RUBYLIB` from Coatepec's own
+installation, not from the app's bundle -- so the worker gets Coatepec's
+`lib` regardless of what the app's Gemfile says. Adding it there is not just
+redundant, it's a version-skew hazard: Bundler would activate whatever
+version is in the app's lockfile while Coatepec itself keeps running the
+version on `RUBYLIB`, and a drift between the two surfaces as a confusing
+"already activated" failure. The only thing Coatepec needs from the target
+app is `railties`, which is definitionally present in any Rails app you'd
+point it at. Host app footprint is zero: no Gemfile line, no lockfile
+change, no dependency resolution.
 
 With the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code),
 from the Rails app's own root:
 
 ```bash
-claude mcp add coatepec --scope project -- bundle exec coatepec --root .
+claude mcp add coatepec --scope project -- coatepec --root .
 ```
 
 That writes a project-scoped `.mcp.json` you can commit so the whole team
@@ -36,8 +41,8 @@ same thing looks like:
 {
   "mcpServers": {
     "coatepec": {
-      "command": "bundle",
-      "args": ["exec", "coatepec", "--root", "."]
+      "command": "coatepec",
+      "args": ["--root", "."]
     }
   }
 }
@@ -93,6 +98,29 @@ includes an `execution_mode` field (`fork`, `spawn_fallback`, or
 call; `spawn_after_crash` results also carry the crashed fork's own stderr
 under `crashed_fork_stderr` so the crash can be diagnosed.
 
+`macos_fork: true` also effectively requires
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` in Coatepec's own environment.
+Without it, a forked child that touches an Objective-C-initialized class
+aborts -- Coatepec retries via spawn, so it degrades silently to the slow
+path (no crash, no error surfaced) rather than failing loudly, and you
+simply never get the speedup. Set it on the MCP server process itself:
+
+```json
+{
+  "mcpServers": {
+    "coatepec": {
+      "command": "coatepec",
+      "args": ["--root", "."],
+      "env": { "OBJC_DISABLE_INITIALIZE_FORK_SAFETY": "YES" }
+    }
+  }
+}
+```
+
+Be aware this flag disables a real safety check in Apple's Objective-C
+runtime; it's a reasonable trade for a local dev/test sidecar, but it's not
+a no-op.
+
 ## Tools
 
 | Tool | Input | Notes |
@@ -114,6 +142,16 @@ false` rather than whatever your own `config/environments/test.rb` asks for
 worker). For most apps this is invisible, but if you ever see behavior differ
 between Coatepec and your own `bundle exec rspec`, this is the first thing to
 suspect.
+
+### Restarts
+
+If any tool call fails with `sidecar_restart_required`, the target app's
+`Gemfile`/`Gemfile.lock` changed since Coatepec's own parent process (the
+"sidecar") started -- not just the warm test worker, which Coatepec restarts
+on its own. This is expected any time you switch branches, pull, or rebase
+across a commit that touches the Gemfile, since the sidecar is managed by
+your MCP client rather than by Coatepec itself: restart your MCP client (or
+however it manages the Coatepec process) to pick up the change.
 
 ## Security boundary
 
