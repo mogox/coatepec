@@ -130,6 +130,31 @@ a no-op.
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 
+### Example queries
+
+`rails_routes`:
+
+- "What are all the routes in this app?" -- `rails_routes()`
+- "What's the URL for widgets?" -- `rails_routes(query: "widget")`. `query` is a
+  case-insensitive substring match across name, verb, path, controller, *and*
+  action -- not just the path -- so a resource name alone typically returns
+  every route for that resource (index/create/new/...); narrow further with
+  something like `query: "new_widget"` to hit one route by name.
+- "Which routes accept POST?" -- `rails_routes(query: "POST")`, the same
+  substring match applied to the verb column.
+
+`rails_model`:
+
+- "What columns does Widget have, and which are nullable?" --
+  `rails_model(name: "Widget")` -- see `columns[].null`, `columns[].sql_type`,
+  `columns[].default`.
+- "What validations and associations does Widget enforce?" -- same call --
+  see `validators` and `associations`.
+- "What happens if I ask about a non-model class, like a controller?" --
+  `rails_model(name: "ApplicationController")` raises `not_active_record_model`
+  rather than introspecting it (a nonexistent constant raises `model_not_found`
+  instead) -- the tool only ever reflects on `ActiveRecord::Base` descendants.
+
 The warm test worker forces Rails' reload-checking on for its own boot,
 regardless of the target app's own `test.rb` setting (which disables it by
 default) -- so editing a model file takes effect on the next tool call
