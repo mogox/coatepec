@@ -14,6 +14,16 @@ RSpec.describe Coatepec::WorkerManager, type: :integration do
     expect(data[:lifecycle_state]).to eq("ready")
   end
 
+  it "restart! respawns the worker with a new pid/boot_id even when the old one is healthy" do
+    before_status = manager.status
+
+    after_status = manager.restart!
+
+    expect(after_status[:pid]).not_to eq(before_status[:pid])
+    expect(after_status[:boot_id]).not_to eq(before_status[:boot_id])
+    expect(after_status[:lifecycle_state]).to eq("ready")
+  end
+
   it "runs a spec through the warm worker" do
     data = manager.run_spec(paths: ["spec/passing_spec.rb"], example: nil, seed: nil, fail_fast: false,
                             timeout_seconds: 30)

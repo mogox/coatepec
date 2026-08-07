@@ -40,6 +40,15 @@ module Coatepec
       @lock.synchronize { @client&.stop }
     end
 
+    # Unconditionally tears down and respawns the worker, bypassing the usual
+    # "only restart if #ensure_worker! thinks it's needed" check. Manual escape
+    # hatch for rails_runtime_restart, independent of whatever #perform's
+    # rescue below already recovers from automatically.
+    def restart!
+      @lock.synchronize { restart_worker! }
+      status
+    end
+
     private
 
     def dispatch(command, args, timeout:, retried: false)
@@ -57,8 +66,8 @@ module Coatepec
 
     def perform(command, args, timeout:, retried:)
       @client.request(command, args, timeout: timeout)
-    rescue Worker::Client::DisconnectedError
-      raise Coatepec::Error.new(:worker_disconnected, "Worker disconnected") if retried
+    rescue Worker::Client::DisconnectedError, SystemCallError, IOError => e
+      raise Coatepec::Error.new(:worker_disconnected, "Worker disconnected: #{e.message}") if retried
 
       restart_worker!
       dispatch(command, args, timeout: timeout, retried: true)
