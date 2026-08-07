@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.1
+
+- Fix `rails_model` crashing outright for a model with a `has_one`/
+  `has_many :through` association that goes through a polymorphic
+  `belongs_to` (e.g. `has_one :x, through: :notable, source: :y` where
+  `belongs_to :notable, polymorphic: true`). `foreign_key` on that
+  reflection needs a single fixed class to resolve, which a polymorphic
+  association can't provide, and that was previously an unrescued
+  `ArgumentError` that took down the whole response. That specific case now
+  reports `foreign_key: nil`/`class_name: nil` for the affected association,
+  the same way an already-handled plain polymorphic `belongs_to` does.
+- Add a general safety net around each association's metadata: if a single
+  association still fails for some other, not-yet-anticipated
+  `ActiveRecord` reflection quirk, only that association's entry degrades
+  (gaining an `error` field describing what went wrong) instead of the
+  entire `rails_model` call crashing for the whole model.
+
 ## 0.5.0
 
 - **Breaking:** `mcp` is no longer a runtime dependency of the `coatepec`
