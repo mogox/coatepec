@@ -93,7 +93,32 @@ module Coatepec
       end
 
       def associations_for(klass)
-        klass.reflect_on_all_associations.first(MAX_ITEMS).map { |assoc| build_association_data(assoc) }
+        klass.reflect_on_all_associations.first(MAX_ITEMS).map { |assoc| safe_association_data(assoc) }
+      end
+
+      # build_association_data's own field-level rescues (association_class_name,
+      # association_foreign_key) cover every failure mode seen in practice so
+      # far, but ActiveRecord's reflection internals are large enough that
+      # betting the whole rails_model call on having anticipated all of them
+      # is optimistic -- a has_one/has_many :through a polymorphic belongs_to
+      # is exactly the kind of case that wasn't anticipated until it crashed
+      # this method outright (see association_foreign_key). This is the
+      # boundary of last resort: one association's introspection failing
+      # degrades just that entry instead of the whole model. It deliberately
+      # does not rescue StandardError -- a NoMethodError here is a genuine
+      # Coatepec bug (e.g. a typo), and letting that crash loudly beats
+      # silently reporting it as "this association is fine, no data".
+      def safe_association_data(assoc)
+        build_association_data(assoc)
+      rescue NameError, ArgumentError, ::ActiveRecord::ActiveRecordError => e
+        degraded_association_data(assoc, e)
+      end
+
+      def degraded_association_data(assoc, error)
+        {
+          name: assoc.name.to_s, macro: assoc.macro.to_s, class_name: nil, foreign_key: nil, through: nil,
+          polymorphic: nil, error: "#{error.class}: #{error.message}"
+        }
       end
 
       def build_association_data(assoc)
@@ -101,7 +126,7 @@ module Coatepec
           name: assoc.name.to_s,
           macro: assoc.macro.to_s,
           class_name: association_class_name(assoc),
-          foreign_key: assoc.foreign_key.to_s,
+          foreign_key: association_foreign_key(assoc),
           through: assoc.through_reflection&.name&.to_s,
           polymorphic: assoc.polymorphic? || false
         }
@@ -116,6 +141,20 @@ module Coatepec
         return nil if assoc.polymorphic?
 
         assoc.klass.name
+      rescue NameError, ArgumentError
+        nil
+      end
+
+      # A has_one/has_many :through reflection whose `through:` target is
+      # itself a polymorphic belongs_to has no single fixed class either --
+      # ThroughReflection#foreign_key needs through_reflection.klass to find
+      # the source reflection, and .klass on a polymorphic reflection always
+      # raises ArgumentError (see association_class_name above). A dangling
+      # class_name on the reflection itself still raises NameError the same
+      # way. Report foreign_key: nil rather than letting either crash the
+      # call.
+      def association_foreign_key(assoc)
+        assoc.foreign_key.to_s
       rescue NameError, ArgumentError
         nil
       end

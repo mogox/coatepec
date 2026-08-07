@@ -112,6 +112,36 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(notable_assoc["class_name"]).to be_nil
   end
 
+  it "reports nil foreign_key/class_name for a has_one :through a polymorphic belongs_to instead of crashing" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("Note").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # This is the field-level rescue (association_foreign_key) absorbing the
+    # failure cleanly -- no "error" key, same as class_name's existing
+    # polymorphic handling. The coarse safety net one layer up
+    # (safe_association_data) is for failure modes neither field-level
+    # rescue anticipates; it's covered at the unit level instead, since
+    # provoking it here would mean relying on a *second*, still-undiscovered
+    # ActiveRecord reflection quirk.
+    notable_owner_assoc = result["associations"].find { |a| a["name"] == "notable_owner" }
+    expect(notable_owner_assoc).not_to be_nil
+    expect(notable_owner_assoc["class_name"]).to be_nil
+    expect(notable_owner_assoc["foreign_key"]).to be_nil
+    expect(notable_owner_assoc).not_to have_key("error")
+
+    # The failure is scoped to notable_owner alone -- Note's other
+    # association and the rest of its metadata come back intact.
+    notable_assoc = result["associations"].find { |a| a["name"] == "notable" }
+    expect(notable_assoc).not_to be_nil
+    expect(notable_assoc).not_to have_key("error")
+    expect(result["columns"].map { |c| c["name"] }).to include("id", "notable_type", "notable_id")
+  end
+
   it "returns empty/nil table data for an abstract class instead of crashing" do
     stdout, stderr, status = run_model_call(<<~RUBY)
       result = Coatepec::Introspection::Model.new("ApplicationRecord").call
