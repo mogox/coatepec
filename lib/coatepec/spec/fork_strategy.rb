@@ -14,6 +14,15 @@ module Coatepec
           redirect_output(out_w, err_w)
           # Forked children must not share the parent's live DB sockets.
           ActiveRecord::Base.connection_handler.clear_all_connections! if defined?(ActiveRecord::Base)
+          # RSpec freezes its own "load started at" timestamp once, at the moment
+          # rspec/core.rb is first required -- in this architecture, that's when
+          # the long-lived warm worker booted, not when THIS run started. Every
+          # forked child inherits that frozen timestamp via copy-on-write, so
+          # RSpec's own "(files took N seconds to load)" reporting would
+          # otherwise measure "time since the worker booted" and grow across
+          # every run for as long as the worker stays warm. Reset it fresh
+          # before each run.
+          RSpec.configuration.start_time = RSpec::Core::Time.now
 
           status = RSpec::Core::Runner.run(full_args, $stderr, $stdout)
           $stdout.flush
