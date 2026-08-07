@@ -69,6 +69,31 @@ module Coatepec
       end
     end
 
+    # The `rails_runtime_restart` MCP tool: unconditionally tears down and
+    # respawns the test worker, discarding its warm Rails boot. A manual
+    # escape hatch alongside WorkerManager's own automatic dead-worker
+    # detection, for whatever failure mode that detection doesn't catch.
+    class RuntimeRestartTool < ::MCP::Tool
+      tool_name "rails_runtime_restart"
+      description "Tear down and respawn the Coatepec test worker, discarding its warm Rails boot " \
+                  "(use if rails_spec_run/rails_runtime_status keep failing and a fresh worker is needed)"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: false)
+      input_schema(properties: {}, required: [], additionalProperties: false)
+
+      class << self
+        def call(server_context:)
+          started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          data = server_context[:worker_manager].restart!
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          Response.ok(data: data,
+                      meta: { project_root: server_context[:project_root], environment: "test",
+                              duration_ms: duration_ms })
+        rescue Coatepec::Error => e
+          Response.error(e)
+        end
+      end
+    end
+
     # The `rails_routes` MCP tool: lists/filters/paginates the target
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool

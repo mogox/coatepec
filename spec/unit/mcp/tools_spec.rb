@@ -43,6 +43,28 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
+  describe Coatepec::MCP::RuntimeRestartTool do
+    it "returns an ok envelope with the restarted worker's status" do
+      allow(worker_manager).to receive(:restart!).and_return(environment: "test", pid: 999, boot_id: "abc")
+
+      response = described_class.call(server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"]).to eq("environment" => "test", "pid" => 999, "boot_id" => "abc")
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:restart!).and_raise(Coatepec::Error.new(:worker_disconnected, "gone"))
+
+      response = described_class.call(server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("worker_disconnected")
+    end
+  end
+
   describe Coatepec::MCP::RoutesTool do
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
@@ -94,7 +116,7 @@ RSpec.describe "Coatepec MCP tools" do
     server = Coatepec::MCP.build_server(project: project, worker_manager: worker_manager)
 
     expect(server.tools.keys).to contain_exactly(
-      "rails_spec_run", "rails_runtime_status", "rails_routes", "rails_model"
+      "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_routes", "rails_model"
     )
   end
 
@@ -106,6 +128,11 @@ RSpec.describe "Coatepec MCP tools" do
 
     it "rejects unknown arguments to rails_runtime_status" do
       expect { Coatepec::MCP::RuntimeStatusTool.input_schema.validate_arguments("oops" => 1) }
+        .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects unknown arguments to rails_runtime_restart" do
+      expect { Coatepec::MCP::RuntimeRestartTool.input_schema.validate_arguments("oops" => 1) }
         .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
     end
 
