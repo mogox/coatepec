@@ -44,9 +44,21 @@ module Coatepec
     # "only restart if #ensure_worker! thinks it's needed" check. Manual escape
     # hatch for rails_runtime_restart, independent of whatever #perform's
     # rescue below already recovers from automatically.
+    #
+    # Still honors the sidecar-restart invariant: if the Gemfile changed since
+    # boot, a worker-only respawn would silently adopt the new bundle in the
+    # worker while the parent MCP process stays on the old one, so that case
+    # raises :sidecar_restart_required instead of restarting. The check runs
+    # against the *pre-existing* snapshot, before restart_worker! re-baselines
+    # it -- same ordering #dispatch uses. Nothing to compare against on the
+    # very first call.
     def restart!
-      @lock.synchronize { restart_worker! }
-      status
+      @lock.synchronize do
+        raise_sidecar_restart_required! if sidecar_restart_required?
+
+        restart_worker!
+        status
+      end
     end
 
     private
@@ -74,16 +86,23 @@ module Coatepec
     end
 
     def check_for_restart!
-      reason = @change_detector.restart_reason(@snapshot)
-      case reason
+      case @change_detector.restart_reason(@snapshot)
       when :sidecar_restart_required
-        raise Coatepec::Error.new(
-          :sidecar_restart_required,
-          "Gemfile changed; restart your MCP client to restart Coatepec and pick up the change"
-        )
+        raise_sidecar_restart_required!
       when :worker_restart_required
         restart_worker!
       end
+    end
+
+    def sidecar_restart_required?
+      @snapshot && @change_detector.restart_reason(@snapshot) == :sidecar_restart_required
+    end
+
+    def raise_sidecar_restart_required!
+      raise Coatepec::Error.new(
+        :sidecar_restart_required,
+        "Gemfile changed; restart your MCP client to restart Coatepec and pick up the change"
+      )
     end
 
     def ensure_worker!
