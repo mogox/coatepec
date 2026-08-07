@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    coatepec (0.5.1)
+    coatepec (0.5.2)
       railties (>= 7.1, < 8.2)
 
 GEM

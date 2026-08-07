@@ -127,6 +127,7 @@ a no-op.
 |---|---|---|
 | `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | Isolated per run; output capped at 256 KiB per stream |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
+| `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 
@@ -177,6 +178,13 @@ on its own. This is expected any time you switch branches, pull, or rebase
 across a commit that touches the Gemfile, since the sidecar is managed by
 your MCP client rather than by Coatepec itself: restart your MCP client (or
 however it manages the Coatepec process) to pick up the change.
+
+A dead *worker* (as opposed to a dead sidecar) recovers on its own: the
+next tool call detects it and transparently boots a fresh one before
+retrying, whether the worker exited outright or a request to it failed
+with a broken pipe. If you want a fresh worker without waiting for a
+failure -- or one keeps recurring -- call `rails_runtime_restart` directly;
+it always respawns, even if the current worker looks healthy.
 
 ## Security boundary
 
