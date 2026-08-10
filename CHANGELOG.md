@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.2
+
+- Fix `WorkerManager` getting permanently stuck treating a dead worker as
+  alive: `Worker::Client#alive?` used `Process.kill(0, pid)`, which returns
+  true for an unreaped zombie, and the one existing auto-restart-and-retry
+  path only caught `Worker::Client::DisconnectedError`, not a raw
+  `Errno::EPIPE`/`SystemCallError` from writing to a dead worker's pipe.
+  Every call after a worker died this way failed identically, forever --
+  since stdio MCP servers have no lighter reconnect in Claude Code, this
+  previously required a full session restart to recover from.
+- Add `rails_runtime_restart`: unconditionally tears down and respawns the
+  test worker, for whatever the automatic detection above doesn't catch.
+- Fix RSpec's own "(files took N seconds to load)" reporting growing
+  across every `rails_spec_run` call made through the same warm,
+  forked-per-run worker -- it was measuring time since the worker first
+  booted, not time this run's files took to load, because `rspec-core`
+  freezes that timestamp once per process and Coatepec never reset it on
+  reuse.
+
 ## 0.5.1
 
 - Fix `rails_model` crashing outright for a model with a `has_one`/

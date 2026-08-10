@@ -32,9 +32,20 @@ module Coatepec
       def alive?
         return false unless @pid
 
+        # A dead-but-unreaped worker (crash, the OS reclaiming a long-idle
+        # process, anything) is a zombie: Process.kill(0, pid) below would still
+        # succeed against it, since it still holds a process-table entry. Reap it
+        # here so staleness is detected instead of reported as "alive" forever --
+        # nothing else calls Process.wait on this pid except #stop, which only
+        # WorkerManager#restart_worker! reaches, and only once #alive? itself
+        # already says false.
+        _pid, status = Process.waitpid2(@pid, Process::WNOHANG)
+        @pid = nil if status
+        return false unless @pid
+
         Process.kill(0, @pid)
         true
-      rescue Errno::ESRCH
+      rescue Errno::ESRCH, Errno::ECHILD
         false
       end
 
