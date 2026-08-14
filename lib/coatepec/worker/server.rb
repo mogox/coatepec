@@ -42,6 +42,7 @@ module Coatepec
         case command
         when "status" then @runtime.status
         when "spec_run" then handle_spec_run(args)
+        when "flaky_check" then handle_flaky_check(args)
         when "routes" then handle_routes(args)
         when "model" then handle_model(args)
         else
@@ -51,6 +52,10 @@ module Coatepec
 
       def handle_spec_run(args)
         Spec::Runner.new(@project_root, rails_runtime: @runtime).run(**args.transform_keys(&:to_sym))
+      end
+
+      def handle_flaky_check(args)
+        Spec::FlakyChecker.new(@project_root, rails_runtime: @runtime).call(**args.transform_keys(&:to_sym))
       end
 
       def handle_routes(args)

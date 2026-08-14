@@ -28,6 +28,14 @@ module Coatepec
       )
     end
 
+    def check_flaky(paths:, example:, timeout_seconds:, runs:)
+      dispatch(
+        "flaky_check",
+        { paths: paths, example: example, timeout_seconds: timeout_seconds, runs: runs },
+        timeout: (timeout_seconds * runs) + 10
+      )
+    end
+
     def routes(query: nil, limit: 50, offset: 0)
       dispatch("routes", { query: query, limit: limit, offset: offset }, timeout: 30)
     end
