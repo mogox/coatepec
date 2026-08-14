@@ -130,6 +130,7 @@ a no-op.
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
+| `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports examples whose status was inconsistent across runs |
 
 ### Example queries
 
@@ -155,6 +156,21 @@ a no-op.
   `rails_model(name: "ApplicationController")` raises `not_active_record_model`
   rather than introspecting it (a nonexistent constant raises `model_not_found`
   instead) -- the tool only ever reflects on `ActiveRecord::Base` descendants.
+
+`rails_spec_flaky_check`:
+
+- "Is this spec flaky?" -- `rails_spec_flaky_check(paths: ["spec/models/widget_spec.rb"])`
+  runs it 5 times (default), each with an independently random seed
+  (equivalent to RSpec's `--order rand:SEED`), and reports any example
+  whose pass/fail status wasn't the same every time under `flaky_examples`
+  -- distinct from `consistently_failing` (fails every run: broken, not
+  flaky) and examples that passed every run (omitted -- nothing to report).
+- Each round's seed is included in the response (`rounds[].seed`), so a
+  specific divergence can be reproduced afterward with a plain
+  `rails_spec_run(seed: <that seed>)`.
+- `timeout_seconds` is a **per-round** budget, not a total; `runs *
+  timeout_seconds` is capped at 1800s combined (`flaky_check_budget_exceeded`
+  if exceeded) since this tool can run for a while.
 
 The warm test worker forces Rails' reload-checking on for its own boot,
 regardless of the target app's own `test.rb` setting (which disables it by

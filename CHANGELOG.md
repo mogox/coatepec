@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0
+
+- Add `rails_spec_flaky_check`: runs a spec selection multiple times with
+  independently random seeds (RSpec's `--seed` is equivalent to `--order
+  rand:SEED`) and reports which examples' pass/fail status was
+  inconsistent across runs -- separately from examples that failed every
+  run (`consistently_failing`, not flaky) and examples that passed every
+  run (omitted). Each round's seed is included in the response so a
+  specific divergence can be reproduced with a plain `rails_spec_run`
+  call. `rails_spec_run` itself is unchanged by this release.
+
 ## 0.5.2
 
 - Fix `WorkerManager` getting permanently stuck treating a dead worker as
