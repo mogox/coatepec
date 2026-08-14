@@ -94,6 +94,47 @@ module Coatepec
       end
     end
 
+    # The `rails_spec_flaky_check` MCP tool: runs targeted RSpec examples
+    # multiple times with independently random seeds and reports which
+    # examples' pass/fail status was inconsistent across rounds. Separate
+    # tool from rails_spec_run for the same reason rails_spec_profile is --
+    # see docs/superpowers/specs/2026-08-13-flaky-spec-detection-design.md.
+    class FlakyCheckTool < ::MCP::Tool
+      tool_name "rails_spec_flaky_check"
+      description "Run targeted RSpec examples multiple times with random seeds to detect order-dependent or " \
+                  "intermittent flakiness, reporting which examples' status was inconsistent across runs"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
+      input_schema(
+        properties: {
+          paths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 },
+          example: { type: %w[string null] },
+          timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
+          runs: { type: "integer", minimum: 2, maximum: 20 }
+        },
+        required: ["paths"],
+        additionalProperties: false
+      )
+
+      class << self
+        def call(paths:, server_context:, example: nil, timeout_seconds: 120, runs: 5)
+          started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          data = server_context[:worker_manager].check_flaky(
+            paths: paths, example: example, timeout_seconds: timeout_seconds, runs: runs
+          )
+          Response.ok(data: data, meta: meta_for(server_context, started_at))
+        rescue Coatepec::Error => e
+          Response.error(e)
+        end
+
+        private
+
+        def meta_for(server_context, started_at)
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
+        end
+      end
+    end
+
     # The `rails_routes` MCP tool: lists/filters/paginates the target
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool
