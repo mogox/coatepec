@@ -171,6 +171,15 @@ a no-op.
 - `timeout_seconds` is a **per-round** budget, not a total; `runs *
   timeout_seconds` is capped at 1800s combined (`flaky_check_budget_exceeded`
   if exceeded) since this tool can run for a while.
+- Selections over 500 examples are capped per round (the same limit
+  `rails_spec_run` already has), and each round samples a different subset,
+  since execution order varies by design -- for suites this large, narrow
+  `paths`/`example` rather than passing a very broad directory selection.
+- `statuses[]` only aligns positionally with `rounds[]` when no round
+  crashed -- a round whose process itself failed contributes no entry to
+  `statuses[]` (though it still appears in `rounds[]`), so treat positional
+  correspondence as best-effort, not guaranteed, when a round's `status` in
+  `rounds[]` looks like an outright crash rather than a normal pass/fail.
 
 The warm test worker forces Rails' reload-checking on for its own boot,
 regardless of the target app's own `test.rb` setting (which disables it by
