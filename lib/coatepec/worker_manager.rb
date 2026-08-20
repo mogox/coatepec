@@ -28,6 +28,18 @@ module Coatepec
       )
     end
 
+    def check_flaky(paths:, example:, timeout_seconds:, runs:)
+      dispatch(
+        "flaky_check",
+        { paths: paths, example: example, timeout_seconds: timeout_seconds, runs: runs },
+        # Each round costs timeout_seconds *plus* real per-round overhead (process
+        # termination/spawn/result-parsing -- roughly 0.6s+ per round from
+        # ProcessStrategy#terminate's own escalation sleeps alone), so the flat
+        # base slack below is scaled by an extra ~2s per round on top of it.
+        timeout: (timeout_seconds * runs) + (2 * runs) + 10
+      )
+    end
+
     def routes(query: nil, limit: 50, offset: 0)
       dispatch("routes", { query: query, limit: limit, offset: offset }, timeout: 30)
     end

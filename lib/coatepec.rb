@@ -18,6 +18,7 @@ require_relative "coatepec/spec/fork_strategy"
 require_relative "coatepec/spec/spawn_strategy"
 require_relative "coatepec/spec/guarded_fork_strategy"
 require_relative "coatepec/spec/runner"
+require_relative "coatepec/spec/flaky_checker"
 require_relative "coatepec/worker/server"
 require_relative "coatepec/worker_manager"
 

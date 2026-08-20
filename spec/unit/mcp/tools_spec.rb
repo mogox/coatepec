@@ -111,12 +111,40 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
+  describe Coatepec::MCP::FlakyCheckTool do
+    it "returns an ok envelope with the flaky-check report" do
+      allow(worker_manager).to receive(:check_flaky)
+        .with(paths: ["spec/x_spec.rb"], example: nil, timeout_seconds: 120, runs: 5)
+        .and_return(runs: 5, rounds: [], flaky_examples: [], consistently_failing: [])
+
+      response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"]).to eq(
+        "runs" => 5, "rounds" => [], "flaky_examples" => [], "consistently_failing" => []
+      )
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:check_flaky)
+        .and_raise(Coatepec::Error.new(:flaky_check_budget_exceeded, "too much"))
+
+      response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("flaky_check_budget_exceeded")
+    end
+  end
+
   it "registers all tools on a built server" do
     project = instance_double(Coatepec::Project, root: "/app")
     server = Coatepec::MCP.build_server(project: project, worker_manager: worker_manager)
 
     expect(server.tools.keys).to contain_exactly(
-      "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_routes", "rails_model"
+      "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_spec_flaky_check", "rails_routes",
+      "rails_model"
     )
   end
 
@@ -134,6 +162,12 @@ RSpec.describe "Coatepec MCP tools" do
     it "rejects unknown arguments to rails_runtime_restart" do
       expect { Coatepec::MCP::RuntimeRestartTool.input_schema.validate_arguments("oops" => 1) }
         .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects unknown arguments to rails_spec_flaky_check" do
+      expect do
+        Coatepec::MCP::FlakyCheckTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"], "oops" => 1)
+      end.to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
     end
 
     it "still accepts the documented rails_spec_run arguments" do

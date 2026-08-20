@@ -40,6 +40,22 @@ RSpec.describe Coatepec::WorkerManager do
     end
   end
 
+  describe "#check_flaky" do
+    it "scales its dispatch timeout slack with runs, on top of the flat base" do
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { rounds: [] })
+      allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
+
+      manager.check_flaky(paths: ["spec/models/widget_spec.rb"], example: nil, timeout_seconds: 30, runs: 20)
+
+      # (timeout_seconds * runs) + (2 * runs) + 10 == (30 * 20) + (2 * 20) + 10 == 650
+      expect(client).to have_received(:request).with(
+        "flaky_check",
+        hash_including(timeout_seconds: 30, runs: 20),
+        timeout: 650
+      )
+    end
+  end
+
   describe "#restart!" do
     it "unconditionally spawns a fresh client even when the current one reports alive" do
       old_client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil)

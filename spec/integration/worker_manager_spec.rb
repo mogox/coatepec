@@ -31,6 +31,13 @@ RSpec.describe Coatepec::WorkerManager, type: :integration do
     expect(data[:status]).to eq("passed")
   end
 
+  it "checks for flaky specs through the warm worker" do
+    data = manager.check_flaky(paths: ["spec/flaky_fixture_spec.rb"], example: nil, timeout_seconds: 30, runs: 10)
+
+    expect(data[:runs]).to eq(10)
+    expect(data[:flaky_examples]).not_to be_empty
+  end
+
   it "raises sidecar_restart_required when Gemfile.lock changes after boot" do
     manager.status # boots the worker and snapshots the Gemfile
 
