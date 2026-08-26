@@ -78,3 +78,85 @@ non-spawn strategies, vs. a Linux-only opt-out config knob). Paused
 specifically to wait for real signal on how coatepec is actually used
 (Linux vs. macOS, `macos_fork` adoption) before picking a fix, rather than
 guessing.
+
+## Run Rails 8.1's built-in CI (`bin/ci`)
+
+Rails 8.1 introduced `ActiveSupport::ContinuousIntegration`
+(`activesupport/lib/active_support/continuous_integration.rb`) as the
+engine behind a generated `bin/ci`/`config/ci.rb`: a small DSL (`step`,
+`group`) that a new app's `config/ci.rb` uses to declare, by default,
+`bin/setup`, `bin/rubocop`, `bin/bundler-audit`, `bin/importmap audit`
+(if using importmap), `bin/brakeman --quiet --no-pager --exit-on-warn
+--exit-on-error`, and the test suite -- the same steps the generated
+GitHub Actions workflow runs, since that workflow just calls `bin/ci`.
+A coatepec tool that ran this and reported back which steps
+passed/failed would cover security audits (Brakeman, bundler-audit,
+importmap audit) and style checks in one call, for any app that has
+adopted this (Rails 8.1+ only -- confirmed against the actual generator
+template and `ContinuousIntegration` source, not a blog summary).
+
+**The real design obstacle, found while researching this (not yet
+solved):** `ContinuousIntegration` has no structured output at all. Each
+`step` runs via plain `system(*command)` and writes colorized terminal
+text (`✅ Title passed in 1.2s` / `❌ Title failed in 1.2s`); the only
+machine-readable signal is the overall process exit code
+(`abort unless success?`). Two options for whenever this gets designed:
+scrape that text (fragile -- it's an internal, unversioned Rails string
+format, not a documented API), or require the target app's `config/ci.rb`
+in-process and read `ContinuousIntegration#results` (an array of
+`[success, title]` pairs) directly, intercepting the `abort` that
+normally follows a failure -- more work, but reads real data instead of
+parsing text designed for a terminal.
+
+Also worth deciding: whether this becomes its own tool (`rails_ci_run`?)
+or folds into an existing one, and whether "security audits" specifically
+(Brakeman/bundler-audit/importmap audit, independent of the rest of
+`bin/ci`) are worth exposing as a narrower, separate tool for apps that
+don't use Rails 8.1's `bin/ci` scaffold at all but do have those gems.
+
+## Controller introspection
+
+A `rails_controller`-style tool mirroring the existing `rails_model`
+(`Coatepec::Introspection::Model`) and `rails_routes`
+(`Coatepec::Introspection::Routes`) tools' shape: given a controller
+constant, return its actions, `before_action`/`around_action`/`after_action`
+filters (and which actions they apply to), strong-parameter method
+definitions, and included concerns -- via real Rails introspection APIs
+(`ActionController::Base` callback chains, not source parsing), the same
+trust boundary `rails_model` already holds to.
+
+## Background job introspection
+
+A `rails_jobs`-style tool for `ActiveJob` classes: queue name, retry/discard
+configuration (`retry_on`/`discard_on` declarations), and callbacks --
+coatepec currently has no visibility into background jobs at all. Would
+follow the same bounded, read-only, real-API-not-source-parsing pattern as
+`rails_model`.
+
+## Cross-file consistency validation
+
+Distinct from anything coatepec does today: a tool that checks for drift
+*across* files rather than introspecting one thing at a time -- a route
+pointing at a controller action that doesn't exist, a `belongs_to`/`has_many`
+referencing a column or table that isn't in the schema, that kind of thing.
+Surfaced while researching prior art (a competing tool does this via
+source-code parsing); would need its own design for how to do it via
+structured Rails APIs instead, consistent with how every other coatepec
+tool avoids parsing source directly.
+
+## Considered and set aside
+
+- **Environment variable / credentials discovery** (a prior-art tool
+  exposes this). Cuts directly against coatepec's "no credential access"
+  security boundary -- not a fit regardless of usefulness.
+- **AST-based code pattern analysis** (concerns, callbacks, service
+  objects, helper methods, by parsing source rather than calling real
+  Rails APIs). A meaningfully different, heavier, more fragile approach
+  than every existing coatepec tool takes. Not ruled out forever, but a
+  clear departure from the project's current trust model, not a natural
+  extension of it.
+- **Rails dev server lifecycle management** (start/stop/monitor `rails s`
+  via MCP -- a different tool in the ecosystem does exactly this). A
+  different category of feature (process lifecycle, not test/introspection)
+  from everything else on this list; noted here for completeness, not
+  actively being considered.
