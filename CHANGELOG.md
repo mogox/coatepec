@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1
+
+- Add `rails_job`: bounded ActiveJob class introspection (queue name, queue
+  priority, `before_perform`/`after_perform`/`around_perform` callbacks, and
+  the exception classes with a `retry_on`/`discard_on`/`rescue_from` handler
+  registered), the same read-only, real-API-only shape `rails_model` already
+  holds to. `rescued_exceptions` is deliberately a bare exception-class list,
+  not full retry/discard configuration -- `retry_on`'s and `discard_on`'s
+  `wait:`/`attempts:`/`queue:`/`priority:` options are closed over inside an
+  internal Proc, not stored anywhere ActiveJob exposes for introspection.
+
 ## 0.6.0
 
 - Add `rails_spec_flaky_check`: runs a spec selection multiple times with

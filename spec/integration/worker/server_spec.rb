@@ -122,4 +122,26 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     expect(response[:ok]).to be(false)
     expect(response[:error][:code]).to eq("invalid_model_name")
   end
+
+  it "answers a job command" do
+    @pid, protocol = spawn_worker
+
+    protocol.write(id: 1, command: "job", args: { name: "WidgetIndexJob" })
+    response = protocol.read
+
+    expect(response[:ok]).to be(true)
+    expect(response[:data][:name]).to eq("WidgetIndexJob")
+    expect(response[:data][:queue_name]).to eq("low_priority")
+    expect(response[:data][:rescued_exceptions]).not_to be_empty
+  end
+
+  it "answers with a structured error for an invalid job name" do
+    @pid, protocol = spawn_worker
+
+    protocol.write(id: 1, command: "job", args: { name: "not_a_constant" })
+    response = protocol.read
+
+    expect(response[:ok]).to be(false)
+    expect(response[:error][:code]).to eq("invalid_job_name")
+  end
 end

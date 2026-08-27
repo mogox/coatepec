@@ -130,6 +130,7 @@ a no-op.
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
+| `rails_job` | `name` (constant path, e.g. `SendMailJob` or `Admin::SendMailJob`) | ActiveJob classes only; queue name/priority, perform callbacks, rescued exception classes -- no enqueuing, no execution |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports examples whose status was inconsistent across runs |
 
 ### Example queries
@@ -156,6 +157,22 @@ a no-op.
   `rails_model(name: "ApplicationController")` raises `not_active_record_model`
   rather than introspecting it (a nonexistent constant raises `model_not_found`
   instead) -- the tool only ever reflects on `ActiveRecord::Base` descendants.
+
+`rails_job`:
+
+- "What queue does WidgetIndexJob run on, and at what priority?" --
+  `rails_job(name: "WidgetIndexJob")` -- see `queue_name`, `queue_priority`.
+- "Does this job retry or discard on any particular exception?" -- same call --
+  see `rescued_exceptions`. This is a bare list of exception class names with
+  *some* handler registered (`retry_on`, `discard_on`, or a plain
+  `rescue_from` all look the same from outside) -- it cannot show which macro
+  registered a given exception, or its `wait:`/`attempts:`/`queue:`/
+  `priority:` options, since those are closed over inside the handler itself
+  rather than stored as separate, introspectable class metadata.
+- "What happens if I ask about a non-job class, like a model?" --
+  `rails_job(name: "Widget")` raises `not_active_job` rather than
+  introspecting it (a nonexistent constant raises `job_not_found` instead) --
+  the tool only ever reflects on `ActiveJob::Base` descendants.
 
 `rails_spec_flaky_check`:
 
@@ -233,9 +250,10 @@ principle.
 Coatepec takes the opposite approach: there's no eval, console, or SQL
 tool to begin with. `rails_spec_run` only ever executes RSpec files that
 already exist under the app's own allowed spec roots, and `rails_routes`/
-`rails_model` only ever call structured, read-only Rails APIs
-(`Rails.application.routes.routes`, `ActiveRecord` reflection) -- never
-`eval`, `const_get` on unvalidated input, or arbitrary method dispatch. If
+`rails_model`/`rails_job` only ever call structured, read-only Rails APIs
+(`Rails.application.routes.routes`, `ActiveRecord` reflection, `ActiveJob`
+class/callback introspection) -- never `eval`, `const_get` on unvalidated
+input, or arbitrary method dispatch. If
 you genuinely need a Rails console over MCP, Rails Active MCP is built for
 that; Coatepec is for teams who want an agent to run specs and read
 structure without ever handing it a REPL.
