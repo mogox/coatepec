@@ -40,6 +40,21 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     expect(set_widget["only"]).to be_nil
   end
 
+  it "collects a real anonymous block callback and one contributed by a concern's included block" do
+    callbacks = result_for("WidgetsController")["callbacks"]
+
+    # `before_action { head :ok }` -- a genuine Rails-built anonymous callback,
+    # not a stubbed Proc, proving it is reduced to "(block)" and never leaks
+    # Proc#to_s's absolute source path.
+    expect(callbacks.map { |cb| cb["filter"] }).to include("(block)")
+
+    # `record_audit`, registered by Auditable's `included do before_action
+    # :record_audit end`, proving callbacks contributed by a concern are
+    # collected from the real _process_action_callbacks chain, not just ones
+    # declared directly on the controller.
+    expect(callbacks.map { |cb| cb["filter"] }).to include("record_audit")
+  end
+
   it "names a Symbol condition but reduces a Proc condition to (block)" do
     callbacks = result_for("WidgetsController")["callbacks"]
 
@@ -68,7 +83,11 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     update = result["actions"].find { |a| a["name"] == "update" }
     expect(update["routes"].map { |r| r["verb"] }).to contain_exactly("PATCH", "PUT")
 
-    expect(result["unroutable_actions"]).to include("orphaned")
+    # "orphaned" has no route at all; "audit" (Auditable's public method) is
+    # also unroutable, since routes.rb only routes index/show/edit/update.
+    # Exact-set, not include(), so a regression that dropped "audit" while
+    # keeping "orphaned" cannot pass.
+    expect(result["unroutable_actions"]).to contain_exactly("audit", "orphaned")
     expect(result["routes_without_action"]).to eq(["removed_long_ago"])
   end
 
@@ -94,6 +113,14 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     expect(result["actions"].map { |a| a["name"] }).to include("index")
     index = result["actions"].find { |a| a["name"] == "index" }
     expect(index["routes"].first["path"]).to eq("/pings(.:format)")
+
+    # Proves the concern slice resolves to ActionController::API for an
+    # API-only controller, not just ActionController::Base: if framework_base
+    # failed to match ActionController::API, concerns_for's take_while would
+    # run unterminated and return up to 200 framework module names instead.
+    concerns = result["concerns"]
+    expect(concerns.grep(/^(ActionController|AbstractController|ActiveSupport)::/)).to be_empty
+    expect(concerns).to eq([])
   end
 
   it "raises not_action_controller for a model constant" do
