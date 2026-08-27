@@ -43,10 +43,20 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
   it "collects a real anonymous block callback and one contributed by a concern's included block" do
     callbacks = result_for("WidgetsController")["callbacks"]
 
-    # `before_action { head :ok }` -- a genuine Rails-built anonymous callback,
-    # not a stubbed Proc, proving it is reduced to "(block)" and never leaks
-    # Proc#to_s's absolute source path.
-    expect(callbacks.map { |cb| cb["filter"] }).to include("(block)")
+    # `before_action(if: :widgets_own_block?) { head :ok }` -- a genuine
+    # Rails-built anonymous callback, not a stubbed Proc, proving it is
+    # reduced to "(block)" and never leaks Proc#to_s's absolute source path.
+    # Anchored on the if: condition's method name, unique to this fixture's
+    # own callback, rather than on filter == "(block)" alone: on Rails 8.1,
+    # ApplicationController's `allow_browser versions: :modern` itself
+    # compiles to a second, unconditional `before_action -> { ... }`, so
+    # WidgetsController's real chain carries two "(block)" filters there --
+    # `include("(block)")` alone would still pass with this fixture's own
+    # block deleted. This holds identically on 7.1 (where allow_browser
+    # doesn't exist) because it is not counting "(block)" filters at all.
+    widgets_block = callbacks.find { |cb| cb["if"] == ["widgets_own_block?"] }
+    expect(widgets_block).not_to be_nil
+    expect(widgets_block["filter"]).to eq("(block)")
 
     # `record_audit`, registered by Auditable's `included do before_action
     # :record_audit end`, proving callbacks contributed by a concern are

@@ -46,7 +46,7 @@ module Coatepec
           name: klass.name, controller_path: klass.controller_path,
           actions: actions.map { |action| { name: action, routes: routes.fetch(action, []) } },
           unroutable_actions: actions.reject { |action| routes.key?(action) },
-          routes_without_action: (routes.keys - actions).sort,
+          routes_without_action: routes_without_action(klass, routes),
           callbacks: callbacks_for(klass, actions), concerns: concerns_for(klass)
         }
       end
@@ -122,6 +122,19 @@ module Coatepec
         matching.group_by { |route| route.defaults[:action].to_s }.reject { |action, _| action.empty? }
       end
 
+      # Differenced against the controller's full action_methods set, not the
+      # (possibly truncated-to-MAX_ITEMS) displayed `actions` list -- a
+      # controller with more than MAX_ITEMS action methods would otherwise
+      # have every route whose action fell past the truncation point reported
+      # here as a false positive, in the field the README calls the tool's
+      # most actionable output. Bounded to MAX_ITEMS like every other
+      # collection in this payload; `grouped_routes` itself caps each route
+      # *list* but not its key count, so this is where that cap belongs.
+      def routes_without_action(klass, routes)
+        defined_actions = klass.action_methods.map(&:to_s)
+        (routes.keys - defined_actions).sort.first(MAX_ITEMS)
+      end
+
       # path keeps Rails' raw spec, `(.:format)` suffix included, so a path
       # string here is byte-identical to the same route as reported by
       # rails_routes. Stripping it would make the two tools disagree about the
@@ -140,7 +153,13 @@ module Coatepec
       end
       # rubocop:enable Lint/IneffectiveAccessModifier
 
+      # Gated on Metal, not Base/API, so a bare ActionController::Metal
+      # subclass -- which passes validate_action_controller!'s class gate but
+      # does not include AbstractController::Callbacks, unlike Base and API --
+      # gets an empty callback list instead of a NoMethodError.
       def callbacks_for(klass, actions)
+        return [] unless klass.respond_to?(:_process_action_callbacks)
+
         klass._process_action_callbacks.first(MAX_ITEMS).map do |callback|
           conditions_for(callback, actions)
             .merge(kind: callback.kind.to_s, filter: filter_description(callback.filter))
@@ -163,8 +182,8 @@ module Coatepec
         ifs = Array(callback.instance_variable_get(:@if))
         unlesses = Array(callback.instance_variable_get(:@unless))
         {
-          only: matched_actions(ifs, actions),
-          except: matched_actions(unlesses, actions),
+          only: matched_actions(ifs, actions, :all?),
+          except: matched_actions(unlesses, actions, :any?),
           if: plain_conditions(ifs),
           unless: plain_conditions(unlesses)
         }
@@ -173,11 +192,30 @@ module Coatepec
       # nil (not []) when there is no ActionFilter at all: "this callback is
       # unrestricted" and "this callback is restricted to no actions" are
       # different facts and must not serialize identically.
-      def matched_actions(conditions, actions)
-        filter = conditions.find { |condition| action_filter?(condition) }
-        return nil unless filter
+      #
+      # A chain routinely carries *more than one* ActionFilter: skip_callback
+      # (ActiveSupport::Callbacks::Callback#merge_conditional_options)
+      # concatenates a skip's normalized only:/except: onto the callback's
+      # existing @if/@unless chain rather than replacing it, so any
+      # `skip_before_action ..., only:`/`except:` leaves two ActionFilters
+      # behind. A callback only runs when *every* @if condition holds and
+      # *none* of its @unless conditions hold (ActiveSupport::Callbacks'
+      # run_callbacks ANDs @if and ANDs the negation of each @unless), so:
+      # only: is every @if ActionFilter's matches intersected (combinator
+      # :all? -- all must hold for the action to run the callback), and
+      # except: is every @unless ActionFilter's matches unioned (combinator
+      # :any? -- any one holding is enough to skip it). Keeping only the
+      # first ActionFilter in the chain (as a naive `find` would) silently
+      # drops every skip layered on top of it, which always biases toward
+      # over-reporting protection -- exactly backwards for a tool whose job is
+      # to answer "is this action protected?".
+      def matched_actions(conditions, actions, combinator)
+        filters = conditions.select { |condition| action_filter?(condition) }
+        return nil if filters.empty?
 
-        actions.select { |action| filter.match?(CallbackProbe.new(action, false)) }
+        actions.select do |action|
+          filters.public_send(combinator) { |filter| filter.match?(CallbackProbe.new(action, false)) }
+        end
       end
 
       def action_filter?(condition)

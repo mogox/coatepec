@@ -176,8 +176,11 @@ a no-op.
   (`"before"`/`"after"`/`"around"`), `filter` (the method name, or `"(block)"`
   for a Proc), `only`/`except` (arrays of action names the filter is
   restricted to/excluded from, or `nil` if unrestricted -- `nil` and `[]` mean
-  different things, so both are preserved), and `if`/`unless` (any remaining
-  conditional, by symbol name or `"(block)"`).
+  different things, so both are preserved: `nil` means no `only:`/`except:`
+  was given at all, while `[]` means one *was* given but names no action this
+  controller actually defines -- e.g. a typo or an action that was since
+  removed -- so `only: []` never runs and `except: []` never skips), and
+  `if`/`unless` (any remaining conditional, by symbol name or `"(block)"`).
 - "What concerns does this controller pull in?" -- same call -- see
   `concerns`: app-defined modules only, whether included directly or
   inherited from a base class; framework modules (`ActionController::Base`

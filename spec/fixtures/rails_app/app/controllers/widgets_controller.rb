@@ -6,7 +6,12 @@ class WidgetsController < ApplicationController
   around_action :with_timing
   after_action :notify, if: :notifiable?
   after_action :audit_trail, if: -> { true }
-  before_action { head :ok }
+  # Anonymous, so it must reduce to "(block)"; guarded by a named if:
+  # condition unique to this controller so a test can pick this callback out
+  # from among any other "(block)" before-callback the framework or a parent
+  # controller may itself contribute (e.g. Rails 8's `allow_browser` compiles
+  # to its own unconditional before_action block on ApplicationController).
+  before_action(if: :widgets_own_block?) { head :ok }
 
   def index
     head :ok
@@ -43,6 +48,10 @@ class WidgetsController < ApplicationController
   def notify; end
 
   def audit_trail; end
+
+  def widgets_own_block?
+    true
+  end
 
   # Raises if ever called. Introspection must never execute a callback
   # condition, so a passing spec proves it didn't.
