@@ -11,6 +11,7 @@ require "coatepec/introspection/controller"
 # actionpack is guaranteed present: railties (a declared runtime dependency,
 # ">= 7.1", "< 8.2") depends on actionpack at the same version.
 require "action_controller"
+require "json"
 require "active_support/inflector"
 
 module ControllerFixtures
@@ -28,11 +29,31 @@ module ControllerFixtures
 
   class WidgetsController < BaseController
     include Auditable
+
+    before_action :require_login, only: %i[edit update]
+    before_action :set_widget, except: [:index]
+    around_action :with_timing
+    after_action :notify, if: :notifiable?
+    after_action :audit_trail, if: -> { true }
+    before_action { head :ok }
+
     def index; end
     def show; end
     def edit; end
     def update; end
     def orphaned; end
+
+    private
+
+    def require_login; end
+    def set_widget; end
+    def with_timing; end
+    def notify; end
+    def audit_trail; end
+
+    def notifiable?
+      raise "callbacks must never be executed during introspection"
+    end
   end
 
   class ThingsController < ActionController::API
@@ -103,6 +124,60 @@ RSpec.describe Coatepec::Introspection::Controller do
     it "slices at ActionController::API for an API controller" do
       result = described_class.new("ControllerFixtures::ThingsController").call
       expect(result[:concerns]).to eq(["ControllerFixtures::Throttled"])
+    end
+  end
+
+  describe "callbacks" do
+    subject(:callbacks) { described_class.new("ControllerFixtures::WidgetsController").call[:callbacks] }
+
+    def callback_for(filter)
+      callbacks.find { |cb| cb[:filter] == filter }
+    end
+
+    it "reports kind and a symbol filter by name" do
+      expect(callback_for("require_login")[:kind]).to eq("before")
+      expect(callback_for("with_timing")[:kind]).to eq("around")
+    end
+
+    # Load-bearing, not incidental: reaching @if/@unless needs a private ivar
+    # read, and if a future Rails renames them, Array(nil) would silently
+    # report every callback as unconditional. This assertion is what turns
+    # that silent degradation into a loud CI failure.
+    it "resolves only: to its action list" do
+      expect(callback_for("require_login")[:only]).to eq(%w[edit update])
+      expect(callback_for("require_login")[:except]).to be_nil
+    end
+
+    it "resolves except: to its action list, preserving author intent" do
+      expect(callback_for("set_widget")[:except]).to eq(["index"])
+      expect(callback_for("set_widget")[:only]).to be_nil
+    end
+
+    it "reports a Symbol if: condition by name" do
+      expect(callback_for("notify")[:if]).to eq(["notifiable?"])
+    end
+
+    it "reports a Proc if: condition as (block), never its source path" do
+      expect(callback_for("audit_trail")[:if]).to eq(["(block)"])
+    end
+
+    it "reports a block filter as (block)" do
+      expect(callback_for("(block)")).not_to be_nil
+    end
+
+    it "leaves unconditional callbacks with empty conditions" do
+      expect(callback_for("with_timing")).to include(only: nil, except: nil, if: [], unless: [])
+    end
+
+    it "never serializes a filesystem path anywhere in the response" do
+      json = JSON.generate(described_class.new("ControllerFixtures::WidgetsController").call)
+      expect(json).not_to include(__dir__)
+      expect(json).not_to match(%r{/[\w.-]+/[\w.-]+\.rb})
+    end
+
+    it "does not execute callback conditions" do
+      # notifiable? raises if called. Reaching this line at all proves it wasn't.
+      expect { described_class.new("ControllerFixtures::WidgetsController").call }.not_to raise_error
     end
   end
 end
