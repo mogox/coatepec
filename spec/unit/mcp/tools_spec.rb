@@ -111,6 +111,36 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
+  describe Coatepec::MCP::ControllerTool do
+    it "is registered under the rails_controller tool name" do
+      expect(described_class.tool_name).to eq("rails_controller")
+    end
+
+    it "returns an ok envelope with the controller data" do
+      allow(worker_manager).to receive(:controller)
+        .with(name: "WidgetsController")
+        .and_return(name: "WidgetsController", actions: [], unroutable_actions: [])
+
+      response = described_class.call(name: "WidgetsController", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"])
+        .to eq("name" => "WidgetsController", "actions" => [], "unroutable_actions" => [])
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:controller)
+        .and_raise(Coatepec::Error.new(:invalid_controller_name, "bad"))
+
+      response = described_class.call(name: "bad name", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("invalid_controller_name")
+    end
+  end
+
   describe Coatepec::MCP::FlakyCheckTool do
     it "returns an ok envelope with the flaky-check report" do
       allow(worker_manager).to receive(:check_flaky)
@@ -144,7 +174,7 @@ RSpec.describe "Coatepec MCP tools" do
 
     expect(server.tools.keys).to contain_exactly(
       "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_spec_flaky_check", "rails_routes",
-      "rails_model"
+      "rails_model", "rails_controller"
     )
   end
 

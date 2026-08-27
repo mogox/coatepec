@@ -48,6 +48,10 @@ module Coatepec
       dispatch("model", { name: name }, timeout: 30)
     end
 
+    def controller(name:)
+      dispatch("controller", { name: name }, timeout: 30)
+    end
+
     def stop
       @lock.synchronize { @client&.stop }
     end

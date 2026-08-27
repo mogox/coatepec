@@ -45,6 +45,7 @@ module Coatepec
         when "flaky_check" then handle_flaky_check(args)
         when "routes" then handle_routes(args)
         when "model" then handle_model(args)
+        when "controller" then handle_controller(args)
         else
           raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
         end
@@ -64,6 +65,10 @@ module Coatepec
 
       def handle_model(args)
         Introspection::Model.new(args.transform_keys(&:to_sym)[:name]).call
+      end
+
+      def handle_controller(args)
+        Introspection::Controller.new(args.transform_keys(&:to_sym)[:name]).call
       end
     end
   end

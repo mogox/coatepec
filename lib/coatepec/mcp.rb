@@ -13,14 +13,15 @@ require_relative "mcp/tools"
 
 module Coatepec
   # Wires the `rails_spec_run`, `rails_runtime_status`, `rails_runtime_restart`,
-  # `rails_spec_flaky_check`, `rails_routes`, and `rails_model` tools into an
-  # `::MCP::Server` instance backed by the given project's worker manager.
+  # `rails_spec_flaky_check`, `rails_routes`, `rails_model`, and `rails_controller`
+  # tools into an `::MCP::Server` instance backed by the given project's worker manager.
   module MCP
     def self.build_server(project:, worker_manager:)
       ::MCP::Server.new(
         name: "coatepec",
         version: Coatepec::VERSION,
-        tools: [SpecRunTool, RuntimeStatusTool, RuntimeRestartTool, FlakyCheckTool, RoutesTool, ModelTool],
+        tools: [SpecRunTool, RuntimeStatusTool, RuntimeRestartTool, FlakyCheckTool, RoutesTool, ModelTool,
+                ControllerTool],
         server_context: { worker_manager: worker_manager, project_root: project.root }
       )
     end
