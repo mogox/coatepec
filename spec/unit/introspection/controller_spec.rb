@@ -79,6 +79,14 @@ module ControllerFixtures
 end
 
 RSpec.describe Coatepec::Introspection::Controller do
+  # Controller.rails_routes reaches Rails.application.routes.routes, which is
+  # only reachable with a real, booted application -- unreachable in this
+  # unit spec process, exactly as for Introspection::Routes. Every example
+  # that calls #call needs it stubbed; this default covers the examples that
+  # don't care about route data. The "route cross-referencing" block below
+  # overrides it with real route fixtures for its own examples.
+  before { allow(described_class).to receive(:rails_routes).and_return([]) }
+
   describe "name validation" do
     it "raises invalid_controller_name for a lowercase-starting name" do
       expect { described_class.new("widgetsController").call }

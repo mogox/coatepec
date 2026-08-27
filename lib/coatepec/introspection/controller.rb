@@ -134,18 +134,9 @@ module Coatepec
       # booting Rails -- Rails.application.routes.routes is otherwise only
       # reachable with a real, booted application. Mirrors
       # Introspection::Routes.rails_routes.
-      #
-      # Rescues NameError so a caller that reaches this method with Rails
-      # itself unloaded -- true only outside this gem's production path,
-      # where the target app is always booted first -- degrades to "no
-      # routes" rather than crashing the whole controller introspection call.
-      # A stub (as in the route cross-referencing specs) replaces this method
-      # body wholesale, so it never hits this rescue.
       # rubocop:disable Lint/IneffectiveAccessModifier
       def self.rails_routes
         Rails.application.routes.routes
-      rescue NameError
-        []
       end
       # rubocop:enable Lint/IneffectiveAccessModifier
 
