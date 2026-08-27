@@ -28,8 +28,13 @@ RSpec.describe Coatepec::Introspection::Job, type: :integration do
 
     before_callback = result["callbacks"].find { |c| c["kind"] == "before" }
     expect(before_callback["filter"]).to eq("log_start")
-    around_callback = result["callbacks"].find { |c| c["kind"] == "around" }
-    expect(around_callback["filter"]).to eq("(block)")
+    # #select rather than #find: on Rails 7.1, ActiveJob::Base itself
+    # registers framework around_perform callbacks (Timezones/Translation)
+    # ahead of WidgetIndexJob's own -- #find would silently match one of
+    # those instead of the fixture's own around_perform { ... } block, and
+    # could pass even if this class's own callback handling regressed.
+    around_filters = result["callbacks"].select { |c| c["kind"] == "around" }.map { |c| c["filter"] }
+    expect(around_filters).to include("(block)")
 
     expect(result["rescued_exceptions"]).to include("Net::OpenTimeout", "ActiveJob::DeserializationError")
   end
@@ -64,6 +69,30 @@ RSpec.describe Coatepec::Introspection::Job, type: :integration do
     expect(result["queue_name"]).to eq("default")
     expect(result["callbacks"]).to eq(base["callbacks"])
     expect(result["rescued_exceptions"]).to eq(base["rescued_exceptions"])
+  end
+
+  it "reports dynamic queue_as/queue_with_priority blocks without executing or leaking them" do
+    stdout, stderr, status = run_job_call(<<~RUBY)
+      $coatepec_dynamic_queue_as_ran = false
+      result = Coatepec::Introspection::Job.new("DynamicWidgetJob").call
+      puts JSON.generate(result.merge(dynamic_queue_as_ran: $coatepec_dynamic_queue_as_ran))
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # Never the literal computed values ("dynamic_queue"/99) -- that would
+    # mean the blocks were evaluated for their return value.
+    expect(result["queue_name"]).to eq("(dynamic)")
+    expect(result["queue_priority"]).to eq("(block)")
+
+    # No Proc #to_s/#source_location leaked the fixture app's absolute path.
+    expect(JSON.generate(result)).not_to include(FIXTURE_APP_ROOT)
+
+    # The queue_as block's side effect genuinely did not run -- this is the
+    # assertion that proves C1 is fixed, not just that the output looks
+    # different.
+    expect(result["dynamic_queue_as_ran"]).to eq(false)
   end
 
   it "raises not_active_job for a real, non-ActiveJob project constant" do

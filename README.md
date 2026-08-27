@@ -169,6 +169,11 @@ a no-op.
   registered a given exception, or its `wait:`/`attempts:`/`queue:`/
   `priority:` options, since those are closed over inside the handler itself
   rather than stored as separate, introspectable class metadata.
+- "What if the job's queue name or priority is computed dynamically?" --
+  a job that calls `queue_as { ... }` or `queue_with_priority { ... }` (the
+  block forms) reports `queue_name: "(dynamic)"` / `queue_priority:
+  "(block)"` rather than evaluating the block -- `rails_job` never executes
+  app code to compute the real value.
 - "What happens if I ask about a non-job class, like a model?" --
   `rails_job(name: "Widget")` raises `not_active_job` rather than
   introspecting it (a nonexistent constant raises `job_not_found` instead) --
@@ -247,16 +252,18 @@ arbitrary Ruby runs in your Rails console, gated by pattern-based
 sophisticated bypasses of a denylist like that are always possible in
 principle.
 
-Coatepec takes the opposite approach: there's no eval, console, or SQL
-tool to begin with. `rails_spec_run` only ever executes RSpec files that
-already exist under the app's own allowed spec roots, and `rails_routes`/
+Coatepec takes the opposite approach: there's no eval, console, or SQL tool
+to begin with. `rails_spec_run` only ever executes RSpec files that already
+exist under the app's own allowed spec roots, and `rails_routes`/
 `rails_model`/`rails_job` only ever call structured, read-only Rails APIs
 (`Rails.application.routes.routes`, `ActiveRecord` reflection, `ActiveJob`
 class/callback introspection) -- never `eval`, `const_get` on unvalidated
-input, or arbitrary method dispatch. If
-you genuinely need a Rails console over MCP, Rails Active MCP is built for
-that; Coatepec is for teams who want an agent to run specs and read
-structure without ever handing it a REPL.
+input, or arbitrary method dispatch. `rails_job` never evaluates a job's
+dynamic `queue_as`/`queue_with_priority` block either -- it reports
+`"(dynamic)"`/`"(block)"` instead of executing app code to compute a real
+value. If you genuinely need a Rails console over MCP, Rails Active MCP is
+built for that; Coatepec is for teams who want an agent to run specs and
+read structure without ever handing it a REPL.
 
 ## Compatibility
 

@@ -34,6 +34,9 @@ module Coatepec
       end
 
       def validate_active_job!(klass)
+        unless defined?(::ActiveJob::Base)
+          raise Coatepec::Error.new(:not_active_job, "ActiveJob is not loaded in this app")
+        end
         return if klass.is_a?(Class) && klass < ::ActiveJob::Base
 
         raise Coatepec::Error.new(:not_active_job, "#{@name} is not an ActiveJob job")
@@ -43,21 +46,46 @@ module Coatepec
         {
           name: klass.name,
           queue_name: queue_name_for(klass),
-          queue_priority: klass.priority,
+          queue_priority: queue_priority_for(klass),
           callbacks: callbacks_for(klass),
           rescued_exceptions: rescued_exceptions_for(klass)
         }
       end
 
-      # klass.queue_name (the class-level reader) returns an *unevaluated
-      # Proc* -- `-> { self.class.default_queue_name }` -- for any job that
-      # never called `queue_as`; only the instance method evaluates that
-      # default. `.new` with no arguments is a safe, side-effect-free
-      # constructor call (no perform, no enqueue) -- the class was already
-      # gated by validate_active_job! before this runs, so this isn't the
-      # "arbitrary method dispatch" the project's security boundary is about.
+      # ActiveJob stores both `queue_name` and `priority` as class attributes
+      # that can hold either a plain value or an unevaluated Proc (the block
+      # form of `queue_as`/`queue_with_priority`), and the two fields are
+      # unsafe in *opposite* directions: the class-level `queue_name` reader
+      # below never executes app code (only the *instance* method does, via
+      # `instance_exec` on the Proc), but it can return that Proc unevaluated
+      # to the caller -- while the class-level `priority` reader in
+      # queue_priority_for is equally safe from execution but would leak a
+      # raw Proc straight into JSON.generate (Proc#to_s exposes the target
+      # app's absolute source file path and line number, the exact leak
+      # Introspection::SafeOptions and filter_description below both guard
+      # against). Neither accessor is uniformly safe, so each field gets its
+      # own explicit handling rather than one shared rule.
+      #
+      # ActiveJob's own default value for this class attribute is a single
+      # shared lambda object installed on ActiveJob::Base by class_attribute
+      # and inherited *by identity* by every subclass that never called
+      # `queue_as` itself -- so a Proc that is not that exact object must be
+      # an app-authored `queue_as { ... }` block, which must never be
+      # instance_exec'd here.
       def queue_name_for(klass)
-        klass.new.queue_name
+        raw = klass.queue_name
+        return klass.queue_name_from_part(nil) if raw.equal?(::ActiveJob::Base.queue_name)
+        return "(dynamic)" if raw.is_a?(Proc)
+
+        raw
+      end
+
+      # See queue_name_for above for why this field needs separate handling:
+      # `queue_with_priority { ... }` stores the raw block as `klass.priority`,
+      # and that Proc must never reach JSON.generate unfiltered.
+      def queue_priority_for(klass)
+        raw = klass.priority
+        raw.is_a?(Proc) ? "(block)" : raw
       end
 
       def callbacks_for(klass)
@@ -93,7 +121,7 @@ module Coatepec
       # rescue_from, or show any of their options. See README for the
       # documented limitation.
       def rescued_exceptions_for(klass)
-        klass.rescue_handlers.first(MAX_ITEMS).map(&:first).uniq
+        klass.rescue_handlers.first(MAX_ITEMS).map(&:first).compact.uniq
       end
     end
   end

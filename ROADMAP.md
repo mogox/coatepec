@@ -125,13 +125,18 @@ definitions, and included concerns -- via real Rails introspection APIs
 (`ActionController::Base` callback chains, not source parsing), the same
 trust boundary `rails_model` already holds to.
 
-## Background job introspection
+## Background job introspection — shipped in 0.6.1 as `rails_job`
 
-A `rails_jobs`-style tool for `ActiveJob` classes: queue name, retry/discard
-configuration (`retry_on`/`discard_on` declarations), and callbacks --
-coatepec currently has no visibility into background jobs at all. Would
-follow the same bounded, read-only, real-API-not-source-parsing pattern as
-`rails_model`.
+Shipped in 0.6.1 as `rails_job`, mirroring `rails_model`'s bounded,
+read-only, real-API-not-source-parsing pattern: queue name, queue priority,
+perform callbacks, and rescued exception classes for `ActiveJob` classes.
+
+Remaining gap: `rails_job` cannot distinguish `retry_on` from `discard_on`
+from a plain `rescue_from`, or surface either macro's `wait:`/`attempts:`/
+`queue:`/`priority:` options, since ActiveJob stores those as closures
+rather than introspectable class metadata. Already documented in the
+README (`rails_job` example queries) and CHANGELOG -- see those rather than
+re-deriving the constraint from scratch.
 
 ## Cross-file consistency validation
 

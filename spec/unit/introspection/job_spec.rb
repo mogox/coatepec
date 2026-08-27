@@ -66,10 +66,37 @@ RSpec.describe Coatepec::Introspection::Job do
       expect { described_class.new("NoSuchJob").call }
         .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:job_not_found) }
     end
+
+    it "raises not_active_job when the target app doesn't load ActiveJob at all" do
+      # No stub_const here -- this gem itself has no activejob dependency
+      # (only activesupport), so ::ActiveJob::Base is genuinely undefined
+      # unless a Rails app booted it, exactly the app configuration this
+      # guards against.
+      expect(defined?(::ActiveJob::Base)).to be_nil
+
+      plain_class = Class.new
+      stub_const("PlainClass", plain_class)
+      allow(::ActiveSupport::Inflector).to receive(:safe_constantize).with("PlainClass").and_return(plain_class)
+
+      expect { described_class.new("PlainClass").call }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:not_active_job) }
+    end
   end
 
   describe "#build_metadata (private, unit-level)" do
     subject(:introspector) { described_class.new("Whatever") }
+
+    # queue_name_for compares klass.queue_name's *identity* against
+    # ::ActiveJob::Base.queue_name to detect the framework's own default --
+    # this gem has no activejob dependency (see the ActiveJob gate examples
+    # above), so a minimal stand-in exposing just that one class method is
+    # stubbed in here for the duration of this describe block.
+    let(:default_queue_name_proc) { -> { "default" } }
+
+    before do
+      default_proc = default_queue_name_proc
+      stub_const("ActiveJob::Base", Class.new { define_singleton_method(:queue_name) { default_proc } })
+    end
 
     # A minimal stand-in for an ActiveJob class: just enough surface for
     # build_metadata to read, without requiring the real activejob gem in
@@ -78,6 +105,7 @@ RSpec.describe Coatepec::Introspection::Job do
     let(:fake_job_class) do
       Class.new do
         def self.name = "FakeJob"
+        def self.queue_name = "low_priority"
         def self.priority = 5
         def self.rescue_handlers = [["ArgumentError", proc {}], ["TypeError", proc {}], ["ArgumentError", proc {}]]
 
@@ -85,14 +113,10 @@ RSpec.describe Coatepec::Introspection::Job do
         define_singleton_method(:_perform_callbacks) do
           [callback_struct.new(:before, :log_start), callback_struct.new(:around, proc { |_job, block| block.call })]
         end
-
-        def initialize; end
-
-        def queue_name = "low_priority"
       end
     end
 
-    it "builds the full metadata hash from class + instance ActiveJob APIs" do
+    it "builds the full metadata hash from class-level ActiveJob APIs" do
       result = introspector.send(:build_metadata, fake_job_class)
 
       expect(result).to eq(
@@ -113,6 +137,14 @@ RSpec.describe Coatepec::Introspection::Job do
       expect(result[:rescued_exceptions].count("ArgumentError")).to eq(1)
     end
 
+    it "drops a nil exception-class name (an anonymous rescue_from target) rather than reporting null" do
+      fake_job_class.define_singleton_method(:rescue_handlers) { [[nil, proc {}], ["ArgumentError", proc {}]] }
+
+      result = introspector.send(:build_metadata, fake_job_class)
+
+      expect(result[:rescued_exceptions]).to eq(["ArgumentError"])
+    end
+
     it "reports a Symbol filter as its bare method name" do
       result = introspector.send(:build_metadata, fake_job_class)
 
@@ -125,6 +157,34 @@ RSpec.describe Coatepec::Introspection::Job do
 
       around_callback = result[:callbacks].find { |c| c[:kind] == "around" }
       expect(around_callback[:filter]).to eq("(block)")
+    end
+
+    it "resolves the framework's own default queue_name Proc rather than serializing or executing it" do
+      default_proc = default_queue_name_proc
+      fake_job_class.define_singleton_method(:queue_name) { default_proc }
+      fake_job_class.define_singleton_method(:queue_name_from_part) { |_part| "resolved_default" }
+
+      result = introspector.send(:build_metadata, fake_job_class)
+
+      expect(result[:queue_name]).to eq("resolved_default")
+    end
+
+    it "reports an app-authored queue_as block as \"(dynamic)\" without executing it" do
+      ran = false
+      fake_job_class.define_singleton_method(:queue_name) { -> { ran = true } }
+
+      result = introspector.send(:build_metadata, fake_job_class)
+
+      expect(result[:queue_name]).to eq("(dynamic)")
+      expect(ran).to be(false)
+    end
+
+    it "reports a queue_with_priority block as the literal string \"(block)\", never its source location" do
+      fake_job_class.define_singleton_method(:priority) { proc {} }
+
+      result = introspector.send(:build_metadata, fake_job_class)
+
+      expect(result[:queue_priority]).to eq("(block)")
     end
   end
 end
