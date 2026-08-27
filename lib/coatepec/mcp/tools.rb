@@ -201,5 +201,38 @@ module Coatepec
         end
       end
     end
+
+    # The `rails_job` MCP tool: returns an ActiveJob class's queue name,
+    # queue priority, perform callbacks, and rescued exception classes.
+    class JobTool < ::MCP::Tool
+      tool_name "rails_job"
+      description "Return bounded ActiveJob metadata (queue name/priority, perform callbacks, rescued " \
+                  "exception classes) for a job class"
+      annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
+      input_schema(
+        properties: {
+          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' }
+        },
+        required: ["name"],
+        additionalProperties: false
+      )
+
+      class << self
+        def call(name:, server_context:)
+          started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          data = server_context[:worker_manager].job(name: name)
+          Response.ok(data: data, meta: meta_for(server_context, started_at))
+        rescue Coatepec::Error => e
+          Response.error(e)
+        end
+
+        private
+
+        def meta_for(server_context, started_at)
+          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
+          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
+        end
+      end
+    end
   end
 end

@@ -111,6 +111,34 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
+  describe Coatepec::MCP::JobTool do
+    it "returns an ok envelope with the job data" do
+      allow(worker_manager).to receive(:job)
+        .with(name: "SendMailJob")
+        .and_return(name: "SendMailJob", queue_name: "default", queue_priority: nil, callbacks: [],
+                    rescued_exceptions: [])
+
+      response = described_class.call(name: "SendMailJob", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(false)
+      expect(payload["data"]).to eq(
+        "name" => "SendMailJob", "queue_name" => "default", "queue_priority" => nil, "callbacks" => [],
+        "rescued_exceptions" => []
+      )
+    end
+
+    it "returns an error envelope when the worker manager raises" do
+      allow(worker_manager).to receive(:job).and_raise(Coatepec::Error.new(:invalid_job_name, "bad"))
+
+      response = described_class.call(name: "bad name", server_context: server_context)
+      payload = JSON.parse(response.content.first[:text])
+
+      expect(response.error?).to be(true)
+      expect(payload["error"]["code"]).to eq("invalid_job_name")
+    end
+  end
+
   describe Coatepec::MCP::FlakyCheckTool do
     it "returns an ok envelope with the flaky-check report" do
       allow(worker_manager).to receive(:check_flaky)
@@ -144,7 +172,7 @@ RSpec.describe "Coatepec MCP tools" do
 
     expect(server.tools.keys).to contain_exactly(
       "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_spec_flaky_check", "rails_routes",
-      "rails_model"
+      "rails_model", "rails_job"
     )
   end
 

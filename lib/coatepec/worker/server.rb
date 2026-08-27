@@ -45,6 +45,7 @@ module Coatepec
         when "flaky_check" then handle_flaky_check(args)
         when "routes" then handle_routes(args)
         when "model" then handle_model(args)
+        when "job" then handle_job(args)
         else
           raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
         end
@@ -64,6 +65,10 @@ module Coatepec
 
       def handle_model(args)
         Introspection::Model.new(args.transform_keys(&:to_sym)[:name]).call
+      end
+
+      def handle_job(args)
+        Introspection::Job.new(args.transform_keys(&:to_sym)[:name]).call
       end
     end
   end
