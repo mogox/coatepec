@@ -125,13 +125,48 @@ definitions, and included concerns -- via real Rails introspection APIs
 (`ActionController::Base` callback chains, not source parsing), the same
 trust boundary `rails_model` already holds to.
 
-## Background job introspection
+## Background job introspection -- built, then parked (PR #14, closed unmerged)
 
-A `rails_jobs`-style tool for `ActiveJob` classes: queue name, retry/discard
-configuration (`retry_on`/`discard_on` declarations), and callbacks --
-coatepec currently has no visibility into background jobs at all. Would
-follow the same bounded, read-only, real-API-not-source-parsing pattern as
-`rails_model`.
+The original idea: a `rails_job`-style tool for `ActiveJob` classes --
+queue name, retry/discard configuration, and callbacks -- following the
+same bounded, read-only, real-API-not-source-parsing pattern as
+`rails_model`, since coatepec has no visibility into background jobs at
+all today.
+
+It was fully built and reviewed as `rails_job`
+(`Coatepec::Introspection::Job`), then **closed unmerged** in
+[PR #14](https://github.com/mogox/coatepec/pull/14) -- the diff and its
+review history stay there, so nothing needs re-deriving if this is picked
+back up.
+
+**Why it was parked:** the tool only sees `ActiveJob::Base` subclasses.
+That's not an implementation shortcut -- it's the trust boundary doing its
+job: the whole design reads real Rails introspection APIs
+(`_perform_callbacks`, `rescue_handlers`, the `queue_name`/`priority` class
+attributes) rather than parsing source, and those APIs exist only on
+ActiveJob. An app whose jobs are native Sidekiq (`include Sidekiq::Job`)
+or Delayed::Job classes gets `:not_active_job` and nothing else, because
+those classes genuinely aren't ActiveJob jobs. (Sidekiq used *as the
+ActiveJob queue adapter* is fine -- those jobs still subclass
+`ApplicationJob`; it's hand-written Sidekiq/delayed_job worker classes
+that fall outside.) Covering them would mean a second, adapter-specific
+introspection path per backend -- `sidekiq_options` for retry/queue/dead,
+`Delayed::Worker` config and `handle_asynchronously` for delayed_job --
+which is a materially bigger design than the ActiveJob one, not a small
+extension of it. Given a limited number of iterations to spend, that
+budget goes to features usable across more real apps first.
+
+Two constraints worth keeping if this is revisited:
+- Even within ActiveJob, `retry_on` / `discard_on` / plain `rescue_from`
+  are indistinguishable, and neither macro's `wait:`/`attempts:`/`queue:`/
+  `priority:` options are introspectable -- ActiveJob closes over them
+  inside a Proc rather than storing them as class metadata. Only the
+  *list* of rescued exception classes is genuinely queryable.
+- `queue_as { ... }` and `queue_with_priority { ... }` store unevaluated
+  app blocks. Reading them naively either executes app code at
+  introspection time or leaks the app's absolute source paths through
+  `Proc#to_s`. PR #14 has the fix for both; any future version needs the
+  same care.
 
 ## Cross-file consistency validation
 
