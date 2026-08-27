@@ -130,6 +130,7 @@ a no-op.
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
+| `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports examples whose status was inconsistent across runs |
 
 ### Example queries
@@ -156,6 +157,50 @@ a no-op.
   `rails_model(name: "ApplicationController")` raises `not_active_record_model`
   rather than introspecting it (a nonexistent constant raises `model_not_found`
   instead) -- the tool only ever reflects on `ActiveRecord::Base` descendants.
+
+`rails_controller`:
+
+- "What actions does WidgetsController define, and what routes reach them?" --
+  `rails_controller(name: "WidgetsController")` -- see `actions[].routes`,
+  each with `verb`, `path` (Rails' raw route spec, `(.:format)` suffix
+  included -- byte-identical to the same route's `path` from `rails_routes`),
+  and `route_name`.
+- "Does this controller have dead code, or a route that will 500?" -- same
+  call -- see `unroutable_actions` (action methods no route reaches --
+  probably dead code) and `routes_without_action` (action names the route
+  table expects but the controller doesn't define -- a request to that route
+  raises `AbstractController::ActionNotFound` in production; this is the
+  tool's most actionable output).
+- "What before/after/around filters run on this controller's actions, and
+  under what conditions?" -- same call -- see `callbacks[]`: `kind`
+  (`"before"`/`"after"`/`"around"`), `filter` (the method name, or `"(block)"`
+  for a Proc), `only`/`except` (arrays of action names the filter is
+  restricted to/excluded from, or `nil` if unrestricted -- `nil` and `[]` mean
+  different things, so both are preserved), and `if`/`unless` (any remaining
+  conditional, by symbol name or `"(block)"`).
+- "What concerns does this controller pull in?" -- same call -- see
+  `concerns`: app-defined modules only, whether included directly or
+  inherited from a base class; framework modules (`ActionController::Base`
+  and everything above it in the ancestor chain) are excluded.
+- `rails_controller` admits `ActionController::API` controllers as well as
+  `ActionController::Base` ones. A malformed constant name raises
+  `invalid_controller_name`; a name that doesn't resolve raises
+  `controller_not_found`; a name that resolves but isn't an
+  `ActionController` descendant (a plain class, a model) raises
+  `not_action_controller`.
+
+`rails_controller` has two deliberate limitations, matching a boundary
+`rails_routes` already has:
+
+- **Strong parameters are not reported.** `params.require(:widget).permit(:name,
+  :size)` exists only as code inside a private method body, never as
+  queryable class metadata -- the only way to recover a permit-list is to
+  parse source, which this gem does not do (see `ROADMAP.md`'s "Considered
+  and set aside" section for why source parsing is out of scope generally).
+- **Only the main app's route table is read.** A controller mounted inside an
+  engine will have its actions reported under `unroutable_actions` even where
+  the engine's own routes reach them -- `rails_routes` has the identical
+  boundary today.
 
 `rails_spec_flaky_check`:
 
@@ -233,9 +278,10 @@ principle.
 Coatepec takes the opposite approach: there's no eval, console, or SQL
 tool to begin with. `rails_spec_run` only ever executes RSpec files that
 already exist under the app's own allowed spec roots, and `rails_routes`/
-`rails_model` only ever call structured, read-only Rails APIs
-(`Rails.application.routes.routes`, `ActiveRecord` reflection) -- never
-`eval`, `const_get` on unvalidated input, or arbitrary method dispatch. If
+`rails_model`/`rails_controller` only ever call structured, read-only Rails
+APIs (`Rails.application.routes.routes`, `ActiveRecord` reflection,
+`ActionController` callback/action-method metadata) -- never `eval`,
+`const_get` on unvalidated input, or arbitrary method dispatch. If
 you genuinely need a Rails console over MCP, Rails Active MCP is built for
 that; Coatepec is for teams who want an agent to run specs and read
 structure without ever handing it a REPL.

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.7.0
+
+- Add `rails_controller`: reports an `ActionController` controller's
+  actions, action callbacks, and included concerns. Admits
+  `ActionController::API` controllers as well as `ActionController::Base`
+  ones.
+  - Each action is cross-referenced against `Rails.application.routes`,
+    the same route table `rails_routes` reads: `actions[].routes` lists the
+    verb/path/route name reaching that action (`path` is Rails' raw route
+    spec, `(.:format)` suffix included, byte-identical to `rails_routes`'
+    own `path` for the same route); `unroutable_actions` lists action
+    methods no route reaches (probable dead code); `routes_without_action`
+    lists route action names the controller doesn't define -- a request to
+    one of those raises `AbstractController::ActionNotFound` in production,
+    making this the tool's most actionable output.
+  - `callbacks[]` reports each `before`/`after`/`around` filter's `only`/
+    `except` action restriction (an array, or `nil` if unrestricted -- `nil`
+    and `[]` are distinct and both preserved) and any remaining `if`/
+    `unless` condition (a symbol by name; a Proc reported as `"(block)"`,
+    never serialized directly, since `Proc#to_s` leaks the app's absolute
+    source path).
+  - `concerns` lists app-defined modules only, included directly or
+    inherited from a base class; framework modules are excluded.
+  - **Known limitations, both by design:** strong parameters
+    (`params.require(...).permit(...)`) are not reported -- they exist only
+    as code inside a method body, never as class metadata, and recovering
+    them would require source parsing, which this gem does not do. Only the
+    main app's route table is read, so a controller mounted inside an
+    engine has its actions reported as unroutable even where the engine's
+    own routes reach them -- the same boundary `rails_routes` already has.
+
 ## 0.6.0
 
 - Add `rails_spec_flaky_check`: runs a spec selection multiple times with
