@@ -6,6 +6,12 @@ module Coatepec
     # for the rails_controller MCP tool. Pure reflection over an already-loaded,
     # already-gated class -- no request dispatch, no action execution, and no
     # evaluation of app-authored callback conditions.
+    # rubocop:disable Metrics/ClassLength -- Task 3 (route cross-referencing)
+    # adds genuinely cohesive functionality: routes_by_action, grouped_routes,
+    # route_data, and rails_routes exist solely to serve this class's single
+    # responsibility (reflect on one controller). Splitting them into a
+    # separate collaborator class would fragment that one responsibility
+    # across files for no readability gain, only to satisfy a line count.
     class Controller
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
@@ -35,12 +41,13 @@ module Coatepec
 
       def build_metadata(klass)
         actions = action_names(klass)
+        routes = routes_by_action(klass)
         {
-          name: klass.name,
-          controller_path: klass.controller_path,
-          actions: actions.map { |action| { name: action, routes: [] } },
-          callbacks: callbacks_for(klass, actions),
-          concerns: concerns_for(klass)
+          name: klass.name, controller_path: klass.controller_path,
+          actions: actions.map { |action| { name: action, routes: routes.fetch(action, []) } },
+          unroutable_actions: actions.reject { |action| routes.key?(action) },
+          routes_without_action: (routes.keys - actions).sort,
+          callbacks: callbacks_for(klass, actions), concerns: concerns_for(klass)
         }
       end
 
@@ -93,6 +100,54 @@ module Coatepec
           mod.is_a?(Class) && mod.name.to_s.start_with?("ActionController::")
         end
       end
+
+      # controller_path is the public, correctly-namespaced key Rails itself
+      # stores in a route's defaults (Admin::ReportsController =>
+      # "admin/reports"), so matching on it needs no name munging.
+      #
+      # Only Rails.application.routes is read, so a controller mounted inside
+      # an engine will report its actions as unroutable even though the
+      # engine's own route set reaches them. Introspection::Routes has exactly
+      # the same boundary today; it is documented in the README rather than
+      # silently absorbed.
+      # A route whose defaults[:action] is nil or empty (a mount or redirect)
+      # is skipped, not recorded under an empty-string action.
+      def routes_by_action(klass)
+        grouped_routes(klass).transform_values { |list| list.first(MAX_ITEMS).map { |route| route_data(route) } }
+      end
+
+      def grouped_routes(klass)
+        path = klass.controller_path
+        matching = self.class.rails_routes.select { |route| route.defaults[:controller].to_s == path }
+        matching.group_by { |route| route.defaults[:action].to_s }.reject { |action, _| action.empty? }
+      end
+
+      # path keeps Rails' raw spec, `(.:format)` suffix included, so a path
+      # string here is byte-identical to the same route as reported by
+      # rails_routes. Stripping it would make the two tools disagree about the
+      # same route.
+      def route_data(route)
+        { verb: route.verb.to_s, path: route.path.spec.to_s, route_name: route.name&.to_s }
+      end
+
+      # Isolated as a class method purely so unit tests can stub it without
+      # booting Rails -- Rails.application.routes.routes is otherwise only
+      # reachable with a real, booted application. Mirrors
+      # Introspection::Routes.rails_routes.
+      #
+      # Rescues NameError so a caller that reaches this method with Rails
+      # itself unloaded -- true only outside this gem's production path,
+      # where the target app is always booted first -- degrades to "no
+      # routes" rather than crashing the whole controller introspection call.
+      # A stub (as in the route cross-referencing specs) replaces this method
+      # body wholesale, so it never hits this rescue.
+      # rubocop:disable Lint/IneffectiveAccessModifier
+      def self.rails_routes
+        Rails.application.routes.routes
+      rescue NameError
+        []
+      end
+      # rubocop:enable Lint/IneffectiveAccessModifier
 
       def callbacks_for(klass, actions)
         klass._process_action_callbacks.first(MAX_ITEMS).map do |callback|
@@ -147,16 +202,21 @@ module Coatepec
                   .map { |condition| filter_description(condition) }
       end
 
-      # Mirrors Introspection::Model#filter_description: a Symbol filter (the
-      # method-reference form, e.g. `before_action :require_login`) is safe to
-      # report as-is; a Proc is reduced to "(block)" so no source path leaks.
+      # A Symbol filter (the method-reference form, e.g.
+      # `before_action :require_login`) is a method reference and safe to
+      # report by name; a Proc must never be serialized, because Proc#to_s
+      # leaks the app's absolute source path, so it is reduced to "(block)"
+      # instead. Introspection::SafeOptions guards the same class of leak
+      # elsewhere, by silently dropping Procs from an options hash rather than
+      # substituting a placeholder -- a different mechanism for the same rule.
       def filter_description(filter)
         case filter
         when Symbol then filter.to_s
         when Proc then "(block)"
-        else filter.class.name
+        else filter.class.name || "(anonymous filter class)"
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

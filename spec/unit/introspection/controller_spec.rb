@@ -62,6 +62,20 @@ module ControllerFixtures
   end
 
   class NotAController; end
+
+  # An anonymous filter class (no assigned constant, so #name is nil) has to
+  # fall back to a stable non-nil String in filter_description -- the
+  # documented contract is that `filter` is always a String.
+  class AnonymousFilterController < ActionController::Base
+    before_action Class.new { def before(_controller); end }.new
+    def index; end
+  end
+
+  # Mirrors the real route objects' surface: Introspection::Routes reads
+  # exactly these (verb, path.spec, name, defaults) off each route, so a
+  # struct with the same shape exercises the same code path without a boot.
+  FakePath = Struct.new(:spec)
+  FakeRoute = Struct.new(:verb, :path, :name, :defaults)
 end
 
 RSpec.describe Coatepec::Introspection::Controller do
@@ -178,6 +192,75 @@ RSpec.describe Coatepec::Introspection::Controller do
     it "does not execute callback conditions" do
       # notifiable? raises if called. Reaching this line at all proves it wasn't.
       expect { described_class.new("ControllerFixtures::WidgetsController").call }.not_to raise_error
+    end
+
+    it "falls back to a stable non-nil String for an anonymous filter class" do
+      callbacks = described_class.new("ControllerFixtures::AnonymousFilterController").call[:callbacks]
+      expect(callbacks).not_to be_empty
+      callbacks.each { |cb| expect(cb[:filter]).to be_a(String) }
+    end
+  end
+
+  describe "route cross-referencing" do
+    def fake_route(verb, path, name, controller, action)
+      ControllerFixtures::FakeRoute.new(
+        verb, ControllerFixtures::FakePath.new(path), name,
+        { controller: controller, action: action }
+      )
+    end
+
+    let(:routes) do
+      [
+        fake_route("GET", "/controller_fixtures/widgets(.:format)", "widgets", "controller_fixtures/widgets", "index"),
+        fake_route("GET", "/controller_fixtures/widgets/:id(.:format)", "widget", "controller_fixtures/widgets",
+                   "show"),
+        fake_route("PATCH", "/controller_fixtures/widgets/:id(.:format)", nil, "controller_fixtures/widgets",
+                   "update"),
+        fake_route("PUT", "/controller_fixtures/widgets/:id(.:format)", nil, "controller_fixtures/widgets", "update"),
+        fake_route("GET", "/controller_fixtures/widgets/legacy(.:format)", nil, "controller_fixtures/widgets",
+                   "removed_long_ago"),
+        fake_route("GET", "/other(.:format)", nil, "other", "index"),
+        # A mount/redirect route has no controller or action at all.
+        fake_route("GET", "/up(.:format)", nil, nil, nil)
+      ]
+    end
+
+    subject(:result) do
+      allow(described_class).to receive(:rails_routes).and_return(routes)
+      described_class.new("ControllerFixtures::WidgetsController").call
+    end
+
+    def action(name)
+      result[:actions].find { |a| a[:name] == name }
+    end
+
+    it "attaches the matching route to an action" do
+      expect(action("index")[:routes])
+        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets" }])
+    end
+
+    it "attaches every route reaching one action" do
+      expect(action("update")[:routes].map { |r| r[:verb] }).to eq(%w[PATCH PUT])
+      expect(action("update")[:routes].map { |r| r[:route_name] }).to eq([nil, nil])
+    end
+
+    it "keeps the raw path spec so it matches rails_routes byte-for-byte" do
+      expect(action("show")[:routes].first[:path]).to eq("/controller_fixtures/widgets/:id(.:format)")
+    end
+
+    it "reports an action no route reaches as unroutable" do
+      expect(action("orphaned")[:routes]).to eq([])
+      expect(result[:unroutable_actions]).to include("orphaned")
+      expect(result[:unroutable_actions]).not_to include("index")
+    end
+
+    it "reports a route naming an action the controller does not define" do
+      expect(result[:routes_without_action]).to eq(["removed_long_ago"])
+    end
+
+    it "ignores routes belonging to other controllers and routes with no controller" do
+      all_paths = result[:actions].flat_map { |a| a[:routes] }.map { |r| r[:path] }
+      expect(all_paths).not_to include("/other(.:format)", "/up(.:format)")
     end
   end
 end
