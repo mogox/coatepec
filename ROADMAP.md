@@ -114,16 +114,16 @@ or folds into an existing one, and whether "security audits" specifically
 `bin/ci`) are worth exposing as a narrower, separate tool for apps that
 don't use Rails 8.1's `bin/ci` scaffold at all but do have those gems.
 
-## Controller introspection
+## Controller introspection -- shipped in 0.7.0
 
-A `rails_controller`-style tool mirroring the existing `rails_model`
-(`Coatepec::Introspection::Model`) and `rails_routes`
-(`Coatepec::Introspection::Routes`) tools' shape: given a controller
-constant, return its actions, `before_action`/`around_action`/`after_action`
-filters (and which actions they apply to), strong-parameter method
-definitions, and included concerns -- via real Rails introspection APIs
-(`ActionController::Base` callback chains, not source parsing), the same
-trust boundary `rails_model` already holds to.
+Shipped as `rails_controller` (`Coatepec::Introspection::Controller`) in
+0.7.0: actions, `before`/`after`/`around` callbacks with their `only`/`except`
+restrictions and `if`/`unless` conditions, included concerns, and a
+cross-reference of every action against `Rails.application.routes`
+(`unroutable_actions` / `routes_without_action`). Strong parameters were
+deliberately left out: a `permit` list exists only as code inside a method
+body, and recovering it would mean source parsing (see "Considered and set
+aside" below). See the README and CHANGELOG for the full contract.
 
 ## Background job introspection -- built, then parked (PR #14, closed unmerged)
 
@@ -171,9 +171,12 @@ Two constraints worth keeping if this is revisited:
 ## Cross-file consistency validation
 
 Distinct from anything coatepec does today: a tool that checks for drift
-*across* files rather than introspecting one thing at a time -- a route
-pointing at a controller action that doesn't exist, a `belongs_to`/`has_many`
-referencing a column or table that isn't in the schema, that kind of thing.
+*across* files rather than introspecting one thing at a time -- a
+`belongs_to`/`has_many` referencing a column or table that isn't in the
+schema, that kind of thing. (The route-to-missing-action case is already
+covered per controller by `rails_controller`'s `routes_without_action`,
+shipped in 0.7.0; an app-wide sweep of the whole route table would be the
+cross-file version of that same check.)
 Surfaced while researching prior art (a competing tool does this via
 source-code parsing); would need its own design for how to do it via
 structured Rails APIs instead, consistent with how every other coatepec

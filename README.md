@@ -185,6 +185,12 @@ a no-op.
   `concerns`: app-defined modules only, whether included directly or
   inherited from a base class; framework modules (`ActionController::Base`
   and everything above it in the ancestor chain) are excluded.
+- Unlike `concerns`, `callbacks[]` is *not* filtered to app code: it is the
+  controller's full callback chain, so callbacks Rails itself installs show
+  up too -- `verify_authenticity_token` / `verify_same_origin_request` from
+  the default forgery protection, and a `"(block)"` entry for macros like
+  `allow_browser` that register a Proc. Read the list as "everything that
+  runs around an action", not "everything this app wrote".
 - `rails_controller` admits `ActionController::API` controllers as well as
   `ActionController::Base` ones. A malformed constant name raises
   `invalid_controller_name`; a name that doesn't resolve raises

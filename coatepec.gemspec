@@ -8,10 +8,12 @@ Gem::Specification.new do |spec|
   spec.authors = ["Enrique Mogollan"]
   spec.email = ["emogollan@gmail.com"]
 
-  spec.summary = "Run targeted RSpec examples against a warm Rails test worker over MCP"
+  spec.summary = "Run targeted RSpec examples and introspect Rails structure over MCP, " \
+    "without a Rails console"
   spec.description = "Coatepec is a local stdio MCP sidecar that keeps an isolated Rails " \
-    "test worker warm so coding agents can run targeted RSpec examples quickly, without " \
-    "exposing a general Rails console."
+    "test worker warm so coding agents can run targeted RSpec examples quickly, check " \
+    "specs for flakiness, and read routes, models, and controllers through structured " \
+    "read-only Rails APIs -- without exposing a general Rails console."
   spec.homepage = "https://github.com/mogox/coatepec"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
