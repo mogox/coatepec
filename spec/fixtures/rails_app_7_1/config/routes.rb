@@ -4,7 +4,15 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
-  resources :widgets, only: %i[index show]
+  # Declared before `resources :widgets` so it isn't shadowed by the :show
+  # route. It names an action WidgetsController does not define -- that is
+  # deliberate: rails_controller must report it under routes_without_action.
+  get "widgets/legacy", to: "widgets#removed_long_ago"
+  resources :widgets, only: %i[index show edit update]
+  resources :pings, only: [:index]
+  namespace :admin do
+    resources :reports, only: [:index]
+  end
 
   # Defines the root path route ("/")
   # root "posts#index"
