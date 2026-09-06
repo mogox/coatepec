@@ -57,8 +57,8 @@ MCP client
     v
 Coatepec parent (Rails-free)
     `-- private NDJSON --> test worker (Rails "test", booted lazily, kept warm)
-                              |-- Linux:  Process.fork  --> isolated RSpec child
-                              `-- macOS:  Process.spawn --> fresh RSpec process (default)
+                              |-- Linux:  Process.fork  --> isolated RSpec/Minitest child
+                              `-- macOS:  Process.spawn --> fresh RSpec/Minitest process (default)
                                           Process.fork, guarded --> opt-in, see Configuration
 ```
 
@@ -125,13 +125,15 @@ a no-op.
 
 | Tool | Input | Notes |
 |---|---|---|
-| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | Isolated per run; output capped at 256 KiB per stream |
+| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream |
+| `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
-| `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports examples whose status was inconsistent across runs |
+| `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
+| `rails_test_flaky_check` | same as `rails_spec_flaky_check` | Alias of `rails_spec_flaky_check` |
 
 ### Example queries
 
@@ -242,6 +244,26 @@ worker). For most apps this is invisible, but if you ever see behavior differ
 between Coatepec and your own `bundle exec rspec`, this is the first thing to
 suspect.
 
+`rails_test_run` (Minitest):
+
+- "Run this Minitest file" -- `rails_test_run(paths: ["test/models/widget_test.rb"])`,
+  or the same call through `rails_spec_run`; the framework is decided by the
+  path, not the tool name. `test/models/widget_test.rb:12` runs the one test
+  whose definition spans line 12, and a directory runs every `_test.rb`
+  under it.
+- `example:` is a substring match on the test's method name
+  (`example: "reaches the"` matches `test_reaches_the_database`), passed to
+  Minitest as an escaped regex.
+- Results use RSpec's vocabulary so the shape is identical: a Minitest skip
+  is `"pending"`, an error is `"failed"`; `id` is `ClassName#test_method`.
+- One call may not mix `spec/` and `test/` paths (`mixed_test_frameworks`).
+- Rails' parallel testing is disabled in the child (`PARALLEL_WORKERS=1`), so
+  a large directory selection runs serially under the one timeout budget
+  rather than forking a worker tree.
+- `file:LINE` works even when the app was generated with `--skip-test` (no
+  `rails/test_unit/railtie`) or runs Rails 7.1 with Minitest 6, both of which
+  break Rails' own line filtering; Coatepec installs its own.
+
 ### Restarts
 
 If any tool call fails with `sidecar_restart_required`, the target app's
@@ -262,11 +284,12 @@ it always respawns, even if the current worker looks healthy.
 ## Security boundary
 
 No eval, console, SQL/record access, shell, Rake, or file-write tool. Spec
-selectors must resolve inside an allowed spec root (`spec/`, `packs/*/spec/`,
-`engines/*/spec/`, `gems/*/spec/`); absolute paths, `..`, symlink escapes,
-non-`_spec.rb` files, and more than 100 selectors are rejected. RSpec still
-executes application-controlled code; only run Coatepec against a trusted
-checkout.
+selectors must resolve inside an allowed spec or test root (`spec/`, `test/`,
+and the `packs/*/`, `engines/*/`, `gems/*/` variants of each); absolute
+paths, `..`, symlink escapes, files that are neither `_spec.rb` under a spec
+root nor `_test.rb` under a test root, and more than 100 selectors are
+rejected. RSpec and Minitest still execute application-controlled code; only
+run Coatepec against a trusted checkout.
 
 ### Compared to Rails Active MCP
 
@@ -279,8 +302,8 @@ sophisticated bypasses of a denylist like that are always possible in
 principle.
 
 Coatepec takes the opposite approach: there's no eval, console, or SQL
-tool to begin with. `rails_spec_run` only ever executes RSpec files that
-already exist under the app's own allowed spec roots, and `rails_routes`/
+tool to begin with. `rails_spec_run` only ever executes RSpec or Minitest
+files that already exist under the app's own allowed spec/test roots, and `rails_routes`/
 `rails_model`/`rails_controller` only ever call structured, read-only Rails
 APIs (`Rails.application.routes.routes`, `ActiveRecord` reflection,
 `ActionController` callback/action-method metadata) -- never `eval`,
@@ -291,9 +314,10 @@ structure without ever handing it a REPL.
 
 ## Compatibility
 
-Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`. CI tests three lanes: Rails 8.1 on
-Linux (primary), Rails 7.1 on Linux (compat), and Rails 8.1 on macOS (which
-is where the guarded-fork path above actually forks).
+Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`, Minitest 5.x and 6.x (the fixture
+apps pin 6.0.6; the 5.x name-filter flag is unit-tested). CI tests three
+lanes: Rails 8.1 on Linux (primary), Rails 7.1 on Linux (compat), and Rails
+8.1 on macOS (which is where the guarded-fork path above actually forks).
 
 ## Development
 

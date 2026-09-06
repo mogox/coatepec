@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.0
+
+- Add Minitest support to `rails_spec_run` and `rails_spec_flaky_check`:
+  selectors under a `test/` root ending in `_test.rb` run through Rails'
+  Minitest runner in the same warm worker, with the same
+  `example`/`seed`/`fail_fast`/`timeout_seconds` inputs and the same result
+  shape (`id` is `ClassName#test_method`; a skip is `"pending"`, an error is
+  `"failed"`). The framework is chosen per call from the selector paths --
+  an app that has both `spec/` and `test/` works without configuration; one
+  call may not mix the two (`mixed_test_frameworks`).
+- Add `rails_test_run` and `rails_test_flaky_check` as aliases of the two
+  tools above, for agents that look for a Minitest-named tool. Identical
+  schema and behaviour.
+- The Minitest child sets `PARALLEL_WORKERS=1`, so a selection above Rails'
+  parallelization threshold runs serially under the call's single timeout
+  instead of forking a worker tree.
+- `file:LINE` selection is implemented by Coatepec itself rather than relying
+  on Rails' line filtering, which is absent in apps generated with
+  `--skip-test` and targets a method Minitest 6 no longer calls on Rails 7.1.
+- Path validation now runs before the framework is required, so an invalid
+  path on a Minitest-only app reports `invalid_spec_path` instead of
+  `unsupported_test_framework`. `invalid_spec_path` keeps its code for both
+  frameworks.
+
 ## 0.7.0
 
 - Add `rails_controller`: reports an `ActionController` controller's
