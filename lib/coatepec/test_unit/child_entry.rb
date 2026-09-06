@@ -21,4 +21,13 @@ project_root = Dir.pwd
 require File.join(project_root, "config/environment")
 
 json_path = ENV.fetch(Coatepec::TestUnit::Adapter::JSON_PATH_ENV)
-exit Coatepec::TestUnit::Adapter.new(project_root).run_in_process(ARGV, json_path)
+status = Coatepec::TestUnit::Adapter.new(project_root).run_in_process(ARGV, json_path)
+$stdout.flush
+$stderr.flush
+# rails/test_help requires active_support/testing/autorun, which arms
+# Minitest.autorun's at_exit hook. A plain `exit` would therefore run the
+# whole suite a second time -- from the now option-stripped ARGV, so without
+# the seed/filter/fail-fast -- and overwrite the JSON report with that second
+# run's results. exit! skips at_exit handlers, exactly as ForkStrategy's
+# child does.
+Kernel.exit!(status)

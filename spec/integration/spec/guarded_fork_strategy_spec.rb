@@ -37,6 +37,32 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy, type: :integration do
     expect(result["execution_mode"]).to eq("fork")
   end
 
+  it "runs a Minitest selection through the guarded fork and through the spawn fallback" do
+    stdout, stderr, status = run_in_worker(<<~RUBY)
+      require "minitest"
+      adapter = Coatepec::TestUnit::Adapter.new(#{FIXTURE_APP_ROOT.inspect})
+      forked = Coatepec::Spec::GuardedForkStrategy
+                 .new(#{FIXTURE_APP_ROOT.inspect}, adapter: adapter, project: project, rails_runtime: runtime)
+                 .run(["test/models/passing_test.rb:9"], 30)
+      fake_runtime = Object.new
+      def fake_runtime.post_boot_thread_count = -1
+      def fake_runtime.loaded_gem_names = []
+      spawned = Coatepec::Spec::GuardedForkStrategy
+                  .new(#{FIXTURE_APP_ROOT.inspect}, adapter: adapter, project: project, rails_runtime: fake_runtime)
+                  .run(["test/models/passing_test.rb:9"], 30)
+      puts JSON.generate(forked: forked, spawned: spawned)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["forked"]["execution_mode"]).to eq("fork")
+    expect(result["forked"]["status"]).to eq("passed"), result["forked"]["stderr"]
+    expect(result["forked"]["examples"].map { |e| e["id"] }).to eq(["PassingTest#test_reaches_the_database"])
+    expect(result["spawned"]["execution_mode"]).to eq("spawn_fallback")
+    expect(result["spawned"]["examples"].map { |e| e["id"] }).to eq(["PassingTest#test_reaches_the_database"])
+  end
+
   it "falls back to spawn without forking when the thread-count guard fails" do
     stdout, stderr, status = run_in_worker(<<~RUBY)
       fake_runtime = Object.new

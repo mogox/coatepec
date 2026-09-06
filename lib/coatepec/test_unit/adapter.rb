@@ -96,12 +96,14 @@ module Coatepec
         $LOAD_PATH.unshift(test_dir) unless $LOAD_PATH.include?(test_dir)
       end
 
-      # `Minitest.load :rails` is what active_support/testing/autorun does on
-      # Minitest 6 to register Rails' plugin without arming autorun; Minitest
+      # rails/test_help pulls in active_support/testing/autorun, which on
+      # Minitest 6 already does `Minitest.load :rails`; the guarded call here
+      # covers a test_help that does not, without registering Rails' plugin
+      # twice (init_plugins would then run plugin_rails_init twice). Minitest
       # 5's #run globs installed gems' plugins itself, so nothing is needed.
       def configure_minitest!(json_path)
         require "rails/test_help"
-        ::Minitest.load(:rails) if ::Minitest.respond_to?(:load)
+        ::Minitest.load(:rails) if ::Minitest.respond_to?(:load) && !::Minitest.extensions.include?("rails")
         require_relative "line_filtering"
         LineFiltering.install!
         register_reporter(json_path)
@@ -110,12 +112,20 @@ module Coatepec
       # Minitest's plugin hook: Minitest.run builds its reporter, then calls
       # plugin_<name>_init for every registered extension with the reporter
       # exposed as Minitest.reporter. Rails' own init only swaps the
-      # Summary/Progress reporters, so an appended reporter survives it.
+      # Summary/Progress reporters, so ours survives it.
+      #
+      # Ours goes to the *front* of the composite, not the end: Rails'
+      # TestUnitReporter implements --fail-fast by raising Interrupt from
+      # inside #record, and CompositeReporter delivers #record in list order,
+      # so a reporter behind it never sees the very failure that aborted the
+      # run -- the one result a fail-fast caller most wants reported.
       def register_reporter(json_path)
         require_relative "json_reporter"
         reporter = JsonReporter.new(json_path, @project_root)
         ::Minitest.extensions << "coatepec" unless ::Minitest.extensions.include?("coatepec")
-        ::Minitest.singleton_class.define_method(:plugin_coatepec_init) { |_options| ::Minitest.reporter << reporter }
+        ::Minitest.singleton_class.define_method(:plugin_coatepec_init) do |_options|
+          ::Minitest.reporter.reporters.unshift(reporter)
+        end
       end
     end
   end

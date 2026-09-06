@@ -19,7 +19,10 @@ module Coatepec
         @started_at = nil
       end
 
+      # A run begins: forget anything recorded before, so a reporter that
+      # outlives one Minitest.run never carries results into the next.
       def start
+        @examples = []
         @started_at = ::Minitest.clock_time
       end
 
