@@ -18,7 +18,7 @@ module Coatepec
 
       def run(paths:, example: nil, seed: nil, fail_fast: false, timeout_seconds: DEFAULT_TIMEOUT)
         require_rspec!
-        selectors = @path_policy.validate!(paths)
+        selectors = @path_policy.validate!(paths)[:selectors]
         args = build_args(selectors, example, seed, fail_fast)
 
         strategy_class.new(@project_root, project: @project, rails_runtime: @rails_runtime).run(args, timeout_seconds)
