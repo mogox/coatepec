@@ -2,13 +2,11 @@
 
 module Coatepec
   module MCP
-    # The `rails_spec_run` MCP tool: runs targeted RSpec examples against
-    # the warm test worker and returns a structured pass/fail result.
+    # The `rails_spec_run` MCP tool: runs targeted RSpec examples or Minitest
+    # tests (chosen from the selector paths) against the warm test worker and
+    # returns a structured pass/fail result.
     class SpecRunTool < ::MCP::Tool
-      tool_name "rails_spec_run"
-      description "Run targeted RSpec examples against a warm, isolated Rails test worker"
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(
+      INPUT_SCHEMA = {
         properties: {
           paths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 },
           example: { type: %w[string null] },
@@ -18,7 +16,13 @@ module Coatepec
         },
         required: ["paths"],
         additionalProperties: false
-      )
+      }.freeze
+
+      tool_name "rails_spec_run"
+      description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
+                  "against a warm, isolated Rails test worker; the framework is chosen from the selector paths"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
+      input_schema(**INPUT_SCHEMA)
 
       class << self
         # rubocop:disable Metrics/ParameterLists -- mirrors the tool's own input_schema
@@ -42,6 +46,18 @@ module Coatepec
           { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
+    end
+
+    # Alias of rails_spec_run for agents that reason from "this app uses
+    # Minitest". Same schema object, same inherited #call; only the name
+    # and description differ. The mcp gem's Tool.inherited resets every
+    # declared attribute on a subclass, so each must be redeclared here.
+    class TestRunTool < SpecRunTool
+      tool_name "rails_test_run"
+      description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
+                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
+      input_schema(**INPUT_SCHEMA)
     end
 
     # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
@@ -94,17 +110,13 @@ module Coatepec
       end
     end
 
-    # The `rails_spec_flaky_check` MCP tool: runs targeted RSpec examples
-    # multiple times with independently random seeds and reports which
-    # examples' pass/fail status was inconsistent across rounds. Separate
-    # tool from rails_spec_run for the same reason rails_spec_profile is --
-    # see docs/superpowers/specs/2026-08-13-flaky-spec-detection-design.md.
+    # The `rails_spec_flaky_check` MCP tool: runs targeted RSpec examples or
+    # Minitest tests multiple times with independently random seeds and
+    # reports which tests' pass/fail status was inconsistent across rounds.
+    # Separate tool from rails_spec_run for the same reason rails_spec_profile
+    # is -- see docs/superpowers/specs/2026-08-13-flaky-spec-detection-design.md.
     class FlakyCheckTool < ::MCP::Tool
-      tool_name "rails_spec_flaky_check"
-      description "Run targeted RSpec examples multiple times with random seeds to detect order-dependent or " \
-                  "intermittent flakiness, reporting which examples' status was inconsistent across runs"
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(
+      INPUT_SCHEMA = {
         properties: {
           paths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 100 },
           example: { type: %w[string null] },
@@ -113,7 +125,14 @@ module Coatepec
         },
         required: ["paths"],
         additionalProperties: false
-      )
+      }.freeze
+
+      tool_name "rails_spec_flaky_check"
+      description "Run targeted RSpec examples or Minitest tests multiple times with random seeds to detect " \
+                  "order-dependent or intermittent flakiness, reporting which tests' status was inconsistent " \
+                  "across runs; the framework is chosen from the selector paths"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
+      input_schema(**INPUT_SCHEMA)
 
       class << self
         def call(paths:, server_context:, example: nil, timeout_seconds: 120, runs: 5)
@@ -133,6 +152,16 @@ module Coatepec
           { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
+    end
+
+    # Alias of rails_spec_flaky_check; see TestRunTool for why the
+    # attributes are redeclared.
+    class TestFlakyCheckTool < FlakyCheckTool
+      tool_name "rails_test_flaky_check"
+      description "Alias of rails_spec_flaky_check: rerun targeted Minitest tests or RSpec examples with random " \
+                  "seeds to detect flakiness -- identical behaviour under either name"
+      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
+      input_schema(**INPUT_SCHEMA)
     end
 
     # The `rails_routes` MCP tool: lists/filters/paginates the target

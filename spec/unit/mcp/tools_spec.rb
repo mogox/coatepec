@@ -168,13 +168,44 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
+  describe Coatepec::MCP::TestRunTool do
+    it "is an alias of rails_spec_run with the same schema and behaviour" do
+      expect(described_class.tool_name).to eq("rails_test_run")
+      expect(described_class.description).to include("rails_spec_run")
+      expect(described_class.input_schema.to_h).to eq(Coatepec::MCP::SpecRunTool.input_schema.to_h)
+      expect(described_class.annotations.to_h).to eq(Coatepec::MCP::SpecRunTool.annotations.to_h)
+
+      allow(worker_manager).to receive(:run_spec)
+        .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120)
+        .and_return(status: "passed")
+      response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
+
+      expect(JSON.parse(response.content.first[:text])["data"]).to eq("status" => "passed")
+    end
+  end
+
+  describe Coatepec::MCP::TestFlakyCheckTool do
+    it "is an alias of rails_spec_flaky_check with the same schema and behaviour" do
+      expect(described_class.tool_name).to eq("rails_test_flaky_check")
+      expect(described_class.description).to include("rails_spec_flaky_check")
+      expect(described_class.input_schema.to_h).to eq(Coatepec::MCP::FlakyCheckTool.input_schema.to_h)
+
+      allow(worker_manager).to receive(:check_flaky)
+        .with(paths: ["test/models/x_test.rb"], example: nil, timeout_seconds: 120, runs: 5)
+        .and_return(runs: 5, rounds: [], flaky_examples: [], consistently_failing: [])
+      response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
+
+      expect(JSON.parse(response.content.first[:text])["data"]["runs"]).to eq(5)
+    end
+  end
+
   it "registers all tools on a built server" do
     project = instance_double(Coatepec::Project, root: "/app")
     server = Coatepec::MCP.build_server(project: project, worker_manager: worker_manager)
 
     expect(server.tools.keys).to contain_exactly(
-      "rails_spec_run", "rails_runtime_status", "rails_runtime_restart", "rails_spec_flaky_check", "rails_routes",
-      "rails_model", "rails_controller"
+      "rails_spec_run", "rails_test_run", "rails_runtime_status", "rails_runtime_restart",
+      "rails_spec_flaky_check", "rails_test_flaky_check", "rails_routes", "rails_model", "rails_controller"
     )
   end
 
