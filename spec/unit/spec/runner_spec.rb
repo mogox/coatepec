@@ -6,6 +6,24 @@ require "tmpdir"
 RSpec.describe Coatepec::Spec::Runner do
   subject(:runner) { described_class.new(FIXTURE_APP_ROOT) }
 
+  describe "framework dispatch" do
+    it "picks the RSpec adapter for :rspec" do
+      expect(runner.send(:adapter_for, :rspec)).to be_a(Coatepec::Spec::RSpecAdapter)
+    end
+
+    it "picks the Minitest adapter for :minitest" do
+      expect(runner.send(:adapter_for, :minitest)).to be_a(Coatepec::TestUnit::Adapter)
+    end
+
+    it "validates paths before requiring any framework, so a bad path reports invalid_spec_path" do
+      allow_any_instance_of(Coatepec::Spec::RSpecAdapter)
+        .to receive(:require_framework!).and_raise("must not be called")
+
+      expect { runner.run(paths: ["../Gemfile"]) }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+    end
+  end
+
   describe "platform gate" do
     def stub_host_os(value)
       allow(RbConfig::CONFIG).to receive(:[]).and_call_original

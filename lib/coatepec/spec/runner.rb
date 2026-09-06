@@ -2,10 +2,11 @@
 
 module Coatepec
   module Spec
-    # Validates a `rails_spec_run` request's paths, builds the RSpec CLI
-    # args, and delegates to the platform-appropriate process strategy
-    # (fork on Linux, spawn on macOS, or a guarded fork on macOS when the
-    # project opts in via .coatepec.yml).
+    # Validates a `rails_spec_run` request's paths, picks the RSpec or
+    # Minitest adapter from their shape, builds the CLI args, and delegates
+    # to the platform-appropriate process strategy (fork on Linux, spawn on
+    # macOS, or a guarded fork on macOS when the project opts in via
+    # .coatepec.yml).
     class Runner
       DEFAULT_TIMEOUT = 120
 
@@ -17,16 +18,25 @@ module Coatepec
       end
 
       def run(paths:, example: nil, seed: nil, fail_fast: false, timeout_seconds: DEFAULT_TIMEOUT)
-        selectors = @path_policy.validate!(paths)[:selectors]
-        adapter = RSpecAdapter.new(@project_root)
+        validated = @path_policy.validate!(paths)
+        adapter = adapter_for(validated[:framework])
         adapter.require_framework!
-        args = adapter.build_args(selectors, example, seed, fail_fast)
+        args = adapter.build_args(validated[:selectors], example, seed, fail_fast)
 
         strategy_class.new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
                       .run(args, timeout_seconds)
       end
 
       private
+
+      # Selector shape decides the framework (see PathPolicy); the adapter
+      # decides everything framework-specific after that.
+      def adapter_for(framework)
+        case framework
+        when :minitest then TestUnit::Adapter.new(@project_root)
+        else RSpecAdapter.new(@project_root)
+        end
+      end
 
       def strategy_class
         case RbConfig::CONFIG["host_os"]
