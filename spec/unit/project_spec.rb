@@ -40,6 +40,28 @@ RSpec.describe Coatepec::Project do
     )
   end
 
+  it "lists test, packs/*/test, engines/*/test, and gems/*/test that exist" do
+    File.write(File.join(@tmp, "Gemfile"), "source 'https://rubygems.org'\n")
+    FileUtils.mkdir_p(File.join(@tmp, "test"))
+    FileUtils.mkdir_p(File.join(@tmp, "packs/billing/test"))
+    FileUtils.mkdir_p(File.join(@tmp, "engines/admin/test"))
+    FileUtils.mkdir_p(File.join(@tmp, "gems/core/spec")) # spec, not test: must be excluded
+
+    project = described_class.new(@tmp)
+
+    expect(project.test_root_candidates).to contain_exactly(
+      File.join(File.expand_path(@tmp), "test"),
+      File.join(File.expand_path(@tmp), "packs/billing/test"),
+      File.join(File.expand_path(@tmp), "engines/admin/test")
+    )
+  end
+
+  it "has no test root candidates for a project without test directories" do
+    File.write(File.join(@tmp, "Gemfile"), "source 'https://rubygems.org'\n")
+
+    expect(described_class.new(@tmp).test_root_candidates).to eq([])
+  end
+
   it "exposes a memoized ProjectConfig rooted at the project root" do
     File.write(File.join(@tmp, "Gemfile"), "source 'https://rubygems.org'\n")
     File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: true\n")

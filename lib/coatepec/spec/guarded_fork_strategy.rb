@@ -36,9 +36,9 @@ module Coatepec
       # along with a whole second result inside MCP::Response's 1 MiB cap.
       MAX_CRASH_STDERR_BYTES = 4 * 1024
 
-      def initialize(project_root, project: nil, rails_runtime: nil)
+      def initialize(project_root, adapter: nil, project: nil, rails_runtime: nil)
         super
-        @spawn_strategy = SpawnStrategy.new(project_root)
+        @spawn_strategy = SpawnStrategy.new(project_root, adapter: @adapter)
       end
 
       def run(args, timeout_seconds)

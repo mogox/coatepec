@@ -14,6 +14,9 @@ RSpec.describe Coatepec::Spec::PathPolicy do
       FileUtils.mkdir_p(File.join(@tmp, "spec/models"))
       File.write(File.join(@tmp, "spec/models/widget_spec.rb"), "")
       File.write(File.join(@tmp, "spec/models/widget.rb"), "")
+      FileUtils.mkdir_p(File.join(@tmp, "test/models"))
+      File.write(File.join(@tmp, "test/models/widget_test.rb"), "")
+      File.write(File.join(@tmp, "test/models/helper.rb"), "")
       FileUtils.mkdir_p(File.join(@tmp, "lib"))
       example.run
     end
@@ -22,15 +25,54 @@ RSpec.describe Coatepec::Spec::PathPolicy do
   subject(:policy) { described_class.new(Coatepec::Project.new(@tmp)) }
 
   it "accepts a spec file under spec/" do
-    expect(policy.validate!(["spec/models/widget_spec.rb"])).to eq(["spec/models/widget_spec.rb"])
+    expect(policy.validate!(["spec/models/widget_spec.rb"]))
+      .to eq(selectors: ["spec/models/widget_spec.rb"], framework: :rspec)
   end
 
   it "accepts a spec file with a line suffix" do
-    expect(policy.validate!(["spec/models/widget_spec.rb:27"])).to eq(["spec/models/widget_spec.rb:27"])
+    expect(policy.validate!(["spec/models/widget_spec.rb:27"]))
+      .to eq(selectors: ["spec/models/widget_spec.rb:27"], framework: :rspec)
   end
 
   it "accepts the spec directory itself" do
-    expect(policy.validate!(["spec"])).to eq(["spec"])
+    expect(policy.validate!(["spec"])).to eq(selectors: ["spec"], framework: :rspec)
+  end
+
+  it "accepts a test file under test/ and classifies it as minitest" do
+    expect(policy.validate!(["test/models/widget_test.rb"]))
+      .to eq(selectors: ["test/models/widget_test.rb"], framework: :minitest)
+  end
+
+  it "accepts a test file with a line suffix" do
+    expect(policy.validate!(["test/models/widget_test.rb:12"]))
+      .to eq(selectors: ["test/models/widget_test.rb:12"], framework: :minitest)
+  end
+
+  it "accepts the test directory itself" do
+    expect(policy.validate!(["test/models"])).to eq(selectors: ["test/models"], framework: :minitest)
+  end
+
+  it "rejects a non-_test.rb file under test/" do
+    expect { policy.validate!(["test/models/helper.rb"]) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+  end
+
+  it "rejects a _spec.rb file placed under test/ and a _test.rb file placed under spec/" do
+    File.write(File.join(@tmp, "test/models/odd_spec.rb"), "")
+    File.write(File.join(@tmp, "spec/models/odd_test.rb"), "")
+
+    expect { policy.validate!(["test/models/odd_spec.rb"]) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+    expect { policy.validate!(["spec/models/odd_test.rb"]) }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_spec_path) }
+  end
+
+  it "rejects a list that mixes spec and test selectors" do
+    expect { policy.validate!(["spec/models/widget_spec.rb", "test/models/widget_test.rb"]) }
+      .to raise_error(Coatepec::Error) { |e|
+        expect(e.code).to eq(:mixed_test_frameworks)
+        expect(e.message).to include("test/models/widget_test.rb")
+      }
   end
 
   it "rejects an empty list" do

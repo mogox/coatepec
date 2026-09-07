@@ -12,7 +12,7 @@ RSpec.describe Coatepec::Spec::ProcessStrategy do
       Class.new(described_class) do
         private
 
-        def start(_full_args, _out_w, _err_w)
+        def start(_full_args, _out_w, _err_w, _json_path)
           raise Errno::EAGAIN
         end
       end

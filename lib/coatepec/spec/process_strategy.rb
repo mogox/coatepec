@@ -4,13 +4,17 @@ require "tempfile"
 
 module Coatepec
   module Spec
-    # Shared child-process lifecycle for running an isolated RSpec run: spawns
-    # (via a subclass's #start), reaps with a timeout budget (TERM then KILL
-    # on overrun), and hands the captured output/JSON to Result. Subclasses
-    # (ForkStrategy, SpawnStrategy) only implement how the child is started.
+    # Shared child-process lifecycle for running an isolated test run (RSpec
+    # or Minitest, chosen by the injected adapter): spawns (via a subclass's
+    # #start), reaps with a timeout budget (TERM then KILL on overrun), and
+    # hands the captured output/JSON to Result. Subclasses (ForkStrategy,
+    # SpawnStrategy) only implement how the child is started; the adapter
+    # supplies the framework-specific CLI args, in-process call, and spawn
+    # command line.
     class ProcessStrategy
-      def initialize(project_root, project: nil, rails_runtime: nil)
+      def initialize(project_root, adapter: nil, project: nil, rails_runtime: nil)
         @project_root = project_root
+        @adapter = adapter || RSpecAdapter.new(project_root)
         @project = project
         @rails_runtime = rails_runtime
       end
@@ -28,9 +32,10 @@ module Coatepec
 
       private
 
-      # Subclasses start a process and return its pid; RSpec's own output
-      # must be wired to out_w/err_w.
-      def start(_full_args, _out_w, _err_w)
+      # Subclasses start a process and return its pid; the test framework's
+      # own output must be wired to out_w/err_w. json_path is where the
+      # adapter's structured per-example output must land.
+      def start(_full_args, _out_w, _err_w, _json_path)
         raise NotImplementedError, "#{self.class} must implement #start"
       end
 
@@ -39,15 +44,11 @@ module Coatepec
       # released have to be freed here. The original exception still reaches
       # the caller -- only GuardedForkStrategy intercepts it to fall back.
       def start_or_release(args, out_w, err_w, json_path, read_ends)
-        start(args + json_format_args(json_path), out_w, err_w)
+        start(args + @adapter.json_args(json_path), out_w, err_w, json_path)
       rescue StandardError
         ([out_w, err_w] + read_ends).each { |io| io.close unless io.closed? }
         File.delete(json_path) if File.exist?(json_path)
         raise
-      end
-
-      def json_format_args(json_path)
-        ["--format", "progress", "--format", "json", "--out", json_path]
       end
 
       def reap(pid, out_r, err_r, timeout_seconds, json_path)

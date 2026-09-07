@@ -4,56 +4,19 @@ Ideas and known future work for Coatepec, roughly in the order they came up.
 Nothing here is committed to a release; this is a place to write things down
 before they're designed, not a promise.
 
-## Minitest support
+## Minitest support -- shipped in 0.8.0
 
-Every current tool (`rails_spec_run`, `rails_spec_flaky_check`, and the
-paused `rails_spec_profile` below) is built around RSpec: `Coatepec::Spec::Runner`
-shells out to `bundle exec rspec`/forks an RSpec process, and
-`Coatepec::Spec::PathPolicy` validates selectors against RSpec's own
-`*_spec.rb` convention. None of that carries over to a Rails app using
-Minitest instead.
-
-The shape of the fix should mirror what already exists rather than
-invent something new: a parallel `Coatepec::Minitest::Runner` (or
-similarly named) implementing the same "validate selectors, build CLI
-args, run via the platform strategy, return a structured result" contract
-`Spec::Runner` already does, reusing `ForkStrategy`/`SpawnStrategy`/`GuardedForkStrategy`
-as-is where their logic is genuinely test-framework-agnostic (they mostly
-just fork/spawn a command and reap it — the RSpec-specific parts are
-`Runner#build_args` and the `--format json` output parsing in
-`Coatepec::Spec::Result`, both of which would need Minitest equivalents:
-Minitest's own JSON/machine-readable reporter, or `minitest-reporters`
-gem output, would need to be identified before designing that half).
-
-**Framework auto-detection via the Gemfile is straightforward and doesn't
-need new machinery** — `Coatepec::Worker::RailsRuntime#loaded_gem_names`
-already exists and is exactly the mechanism `GuardedForkStrategy` uses
-today to check for fork-unsafe gems, and `Coatepec::Spec::FactoryProfRunner`
-(see below) uses to check for `test-prof`. The same `loaded_gem_names.include?("rspec-rails")`
-vs. `.include?("minitest")` check (a Rails app's default `Gemfile` already
-declares one or the other, sometimes both) is enough to route
-`rails_spec_run` (or a to-be-decided `rails_test_run`, if the two
-frameworks' capabilities diverge enough to warrant separate tool names
-rather than one dispatching tool) to the right runner. `Coatepec::Spec::Runner#require_rspec!`
-already anticipates the gap in spirit: it raises `:unsupported_test_framework`
-today when `rspec-rails` isn't loadable, rather than assuming RSpec
-unconditionally.
-
-Open questions for whenever this gets designed properly:
-- One tool name that dispatches by detected framework, or separate
-  `rails_spec_run`/`rails_minitest_run`-style tools? (Affects whether an
-  agent needs to know which framework a given app uses before calling the
-  right tool, vs. the tool figuring it out.)
-- What Minitest gives you for structured per-example output
-  (pass/fail/pending, id, file/line) equivalent to RSpec's `--format json`
-  — needed before `rails_spec_flaky_check`'s per-example flaky-detection
-  logic (`Coatepec::Spec::FlakyChecker`, framework-agnostic in principle
-  since it only depends on `Runner#run`'s result shape) could target
-  Minitest too.
-- Whether Minitest's own `--seed` (it has one; Minitest randomizes test
-  order by default too) is enough of an equivalent to RSpec's `--seed`
-  for `rails_spec_flaky_check` to reuse the same "rerun N times with a
-  fresh random seed" mechanism unchanged.
+Shipped through the existing `rails_spec_run`/`rails_spec_flaky_check`
+tools (plus `rails_test_run`/`rails_test_flaky_check` aliases). The open
+questions resolved as: one tool, dispatching by *selector shape*
+(`test/**/*_test.rb` vs `spec/**/*_spec.rb`) rather than by Gemfile, since
+that is per-request and unambiguous for apps with both; structured
+per-test output comes from an in-process `Minitest::AbstractReporter`
+writing RSpec's JSON shape, so `Spec::Result` and `FlakyChecker` were
+reused unchanged; and Minitest's `--seed` is a direct equivalent (16-bit,
+random order by default), so the flaky checker works as-is. See
+`docs/superpowers/specs/2026-09-05-minitest-support-design.md` (local-only)
+for the design and the line-filtering finding.
 
 ## Get stats on a spec/test run (TestProf / FactoryProf) — designed, implemented, paused
 
