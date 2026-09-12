@@ -8,7 +8,7 @@ module Coatepec
     # included, for the rails_routes MCP tool. Reads route tables only -- no console, no dispatch.
     class Routes
       MAX_LIMIT = 200
-      DEFAULT_LIMIT = 50
+      DEFAULT_LIMIT = 100
 
       def initialize(query: nil, limit: DEFAULT_LIMIT, offset: 0)
         @query = query
@@ -22,11 +22,18 @@ module Coatepec
           items: matched[@offset, @limit] || [],
           matched: matched.size,
           limit: @limit,
-          offset: @offset
+          offset: @offset,
+          next_offset: next_offset_for(matched.size)
         }
       end
 
       private
+
+      # Spelled out so a caller never has to infer a follow-up page from matched > limit.
+      def next_offset_for(matched_count)
+        candidate = @offset + @limit
+        candidate < matched_count ? candidate : nil
+      end
 
       def filtered_items
         items = all_items

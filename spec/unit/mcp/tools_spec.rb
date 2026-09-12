@@ -100,6 +100,15 @@ RSpec.describe "Coatepec MCP tools" do
       expect(payload["data"]).to eq("items" => [], "matched" => 0, "limit" => 50, "offset" => 0)
     end
 
+    it "defaults limit to 100" do
+      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
+                                                           next_offset: nil)
+
+      described_class.call(server_context: server_context)
+
+      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0)
+    end
+
     it "returns an error envelope when the worker manager raises" do
       allow(worker_manager).to receive(:routes).and_raise(Coatepec::Error.new(:worker_disconnected, "gone"))
 

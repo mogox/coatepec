@@ -188,7 +188,7 @@ module Coatepec
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 50, offset: 0)
+        def call(server_context:, query: nil, limit: 100, offset: 0)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset)
           Response.ok(data: data, meta: meta_for(server_context, started_at))

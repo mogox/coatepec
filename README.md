@@ -134,7 +134,7 @@ a no-op.
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes` |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
@@ -167,6 +167,8 @@ a no-op.
   prefixed path, since each of those paths is a real, reachable URL.
   `bin/rails routes` keys engines by endpoint and so lists such an engine
   only once.
+- Paging: when `next_offset` is not `null`, call again with
+  `offset: next_offset` to get the next page.
 
 `rails_model`:
 

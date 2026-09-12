@@ -57,6 +57,9 @@
   options into one entry (a concern and the model body declaring the same
   validation used to appear twice); the 200-item cap now counts distinct
   validators.
+- `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
+  roughly doubled route counts) and returns `next_offset` for the follow-up
+  call, `null` on the last page.
 
 ## 0.7.0
 
