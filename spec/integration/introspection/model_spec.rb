@@ -86,8 +86,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     result = JSON.parse(stdout.lines.last)
 
     # The fixture's Nameable concern and Owner's own body both declare
-    # `validates :name, presence: true`, so Rails builds two identical
-    # validator objects -- the output must carry only one.
+    # `validates :name, presence: true` -- two identical validator objects, one entry.
     presence_validators = result["validators"].select do |v|
       v["name"] == "ActiveRecord::Validations::PresenceValidator" && v["attributes"] == ["name"]
     end
