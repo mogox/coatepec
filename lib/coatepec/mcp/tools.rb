@@ -168,7 +168,9 @@ module Coatepec
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool
       tool_name "rails_routes"
-      description "Return a bounded, filterable list of the Rails app's routes"
+      description "Return a bounded, filterable list of the Rails app's routes, including the routes of mounted " \
+                  "engines (one level deep; paths carry the mount point; each item's engine field names the " \
+                  "engine, null for an application route; query also matches the engine field)"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

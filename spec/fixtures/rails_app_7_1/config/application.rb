@@ -18,6 +18,9 @@ require "action_view/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# A minimal mounted engine so specs can assert engine-route traversal.
+require_relative "../engines/widget_admin/lib/widget_admin"
+
 module RailsApp71
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

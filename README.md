@@ -129,7 +129,7 @@ a no-op.
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action |
+| `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes` |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
@@ -147,6 +147,21 @@ a no-op.
   something like `query: "new_widget"` to hit one route by name.
 - "Which routes accept POST?" -- `rails_routes(query: "POST")`, the same
   substring match applied to the verb column.
+- "Which routes does the Avo engine add?" -- `rails_routes(query: "Avo::Engine")`
+  -- the substring match covers the `engine` column too, so an engine's class
+  name returns exactly the routes mounted from it. Application routes always
+  sort before engine routes, so an unfiltered listing reads the way
+  `bin/rails routes` does.
+- An engine route's `name` is relative to its engine, not a top-level url
+  helper: `{"name": "audits", "path": "/widget_admin/audits(.:format)",
+  "engine": "WidgetAdmin::Engine"}` is reached as
+  `widget_admin.audits_path` -- `<mount name>.<name>_path`, where the mount
+  name is the `name` of the mount route itself -- and `audits_path` alone
+  does not exist on the application.
+- An engine mounted at two paths is listed under both mount points, once per
+  prefixed path, since each of those paths is a real, reachable URL.
+  `bin/rails routes` keys engines by endpoint and so lists such an engine
+  only once.
 
 `rails_model`:
 
@@ -166,7 +181,8 @@ a no-op.
   `rails_controller(name: "WidgetsController")` -- see `actions[].routes`,
   each with `verb`, `path` (Rails' raw route spec, `(.:format)` suffix
   included -- byte-identical to the same route's `path` from `rails_routes`),
-  and `route_name`.
+  `route_name`, and `engine` (`null` for an application route, the engine's
+  class name for a route that reaches this controller through a mount).
 - "Does this controller have dead code, or a route that will 500?" -- same
   call -- see `unroutable_actions` (action methods no route reaches --
   probably dead code) and `routes_without_action` (action names the route
@@ -200,18 +216,22 @@ a no-op.
   `ActionController` descendant (a plain class, a model) raises
   `not_action_controller`.
 
-`rails_controller` has two deliberate limitations, matching a boundary
-`rails_routes` already has:
+`rails_controller` has one deliberate limitation:
 
 - **Strong parameters are not reported.** `params.require(:widget).permit(:name,
   :size)` exists only as code inside a private method body, never as
   queryable class metadata -- the only way to recover a permit-list is to
   parse source, which this gem does not do (see `ROADMAP.md`'s "Considered
   and set aside" section for why source parsing is out of scope generally).
-- **Only the main app's route table is read.** A controller mounted inside an
-  engine will have its actions reported under `unroutable_actions` even where
-  the engine's own routes reach them -- `rails_routes` has the identical
-  boundary today.
+
+Routes drawn by an engine mounted in the application are cross-referenced
+like any other, with the mount point on the path and the engine's class name
+in `engine` -- so a controller that lives inside an engine reports its real
+routes rather than listing every action as unroutable. Their `route_name` is
+engine-local, reached as `<mount name>.<route_name>_path`, exactly as in
+`rails_routes`. Expansion goes one level deep: an engine mounted inside
+another engine stays an opaque mount route, the same boundary `bin/rails
+routes` (and therefore `rails_routes`) draws.
 
 `rails_spec_flaky_check`:
 

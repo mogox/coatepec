@@ -137,6 +137,22 @@ module ControllerFixtures
   FakePath = Struct.new(:spec)
   FakeRoute = Struct.new(:verb, :path, :name, :defaults)
 
+  # A mount route adds one member, `app`. Kept as a separate struct so FakeRoute stays without
+  # `app` and the plain-route examples keep proving RouteEntries' respond_to? guard.
+  FakeMountedApp = Struct.new(:rack_app) do
+    def engine?
+      true
+    end
+  end
+  FakeMountRoute = Struct.new(:verb, :path, :name, :defaults, :app)
+
+  # Reached only through an engine's routes; `export` is deliberately unrouted.
+  class EngineAuditsController < ActionController::Base
+    def index; end
+    def show; end
+    def export; end
+  end
+
   # 250 real action methods, each with a real route -- more than MAX_ITEMS.
   # `actions` in the response is truncated to the first 200 (alphabetically),
   # so routes reaching action_201..action_250 must not be misreported as
@@ -364,7 +380,8 @@ RSpec.describe Coatepec::Introspection::Controller do
 
     it "attaches the matching route to an action" do
       expect(action("index")[:routes])
-        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets" }])
+        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets",
+                  engine: nil }])
     end
 
     it "attaches every route reaching one action" do
@@ -389,6 +406,45 @@ RSpec.describe Coatepec::Introspection::Controller do
     it "ignores routes belonging to other controllers and routes with no controller" do
       all_paths = result[:actions].flat_map { |a| a[:routes] }.map { |r| r[:path] }
       expect(all_paths).not_to include("/other(.:format)", "/up(.:format)")
+    end
+
+    # Rails hands back the engine class itself, whose .routes is a RouteSet wrapping its own routes.
+    # Only a ::Rails::Engine subclass is expanded, hence the stand-in base class.
+    def fake_engine(name, inner_routes)
+      stub_const("Rails::Engine", Class.new)
+      route_set = Struct.new(:routes).new(inner_routes)
+      Class.new(Rails::Engine) do
+        define_singleton_method(:name) { name }
+        define_singleton_method(:routes) { route_set }
+      end
+    end
+
+    def fake_mount(path, engine)
+      ControllerFixtures::FakeMountRoute.new(
+        "", ControllerFixtures::FakePath.new(path), nil, {},
+        ControllerFixtures::FakeMountedApp.new(engine)
+      )
+    end
+
+    it "cross-references a controller reached only through a mounted engine" do
+      engine = fake_engine("WidgetAdmin::Engine", [
+                             fake_route("GET", "/audits(.:format)", "audits",
+                                        "controller_fixtures/engine_audits", "index"),
+                             fake_route("GET", "/audits/:id(.:format)", "audit",
+                                        "controller_fixtures/engine_audits", "show")
+                           ])
+      allow(described_class).to receive(:rails_routes).and_return(routes + [fake_mount("/widget_admin", engine)])
+
+      engine_result = described_class.new("ControllerFixtures::EngineAuditsController").call
+
+      index = engine_result[:actions].find { |a| a[:name] == "index" }
+      # Mount prefix on the path and `engine` set, exactly as rails_routes reports the same route.
+      expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits(.:format)", route_name: "audits",
+                                      engine: "WidgetAdmin::Engine" }])
+      expect(engine_result[:actions].find { |a| a[:name] == "show" }[:routes].first[:path])
+        .to eq("/widget_admin/audits/:id(.:format)")
+      expect(engine_result[:unroutable_actions]).to eq(["export"])
+      expect(engine_result[:routes_without_action]).to eq([])
     end
   end
 

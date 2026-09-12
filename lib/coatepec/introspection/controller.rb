@@ -1,17 +1,15 @@
 # frozen_string_literal: true
 
+require_relative "route_entries"
+
 module Coatepec
   module Introspection
     # Returns bounded ActionController class metadata for a single controller,
     # for the rails_controller MCP tool. Pure reflection over an already-loaded,
     # already-gated class -- no request dispatch, no action execution, and no
     # evaluation of app-authored callback conditions.
-    # rubocop:disable Metrics/ClassLength -- Task 3 (route cross-referencing)
-    # adds genuinely cohesive functionality: routes_by_action, grouped_routes,
-    # route_data, and rails_routes exist solely to serve this class's single
-    # responsibility (reflect on one controller). Splitting them into a
-    # separate collaborator class would fragment that one responsibility
-    # across files for no readability gain, only to satisfy a line count.
+    # rubocop:disable Metrics/ClassLength -- the route cross-referencing methods serve this class's
+    # one responsibility (reflect on one controller); splitting them out would only satisfy a line count.
     class Controller
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
@@ -101,25 +99,20 @@ module Coatepec
         end
       end
 
-      # controller_path is the public, correctly-namespaced key Rails itself
-      # stores in a route's defaults (Admin::ReportsController =>
-      # "admin/reports"), so matching on it needs no name munging.
-      #
-      # Only Rails.application.routes is read, so a controller mounted inside
-      # an engine will report its actions as unroutable even though the
-      # engine's own route set reaches them. Introspection::Routes has exactly
-      # the same boundary today; it is documented in the README rather than
-      # silently absorbed.
-      # A route whose defaults[:action] is nil or empty (a mount or redirect)
-      # is skipped, not recorded under an empty-string action.
+      # Matches on controller_path, Rails' own key in route defaults ("admin/reports"), through
+      # RouteEntries so engine controllers resolve too. Routes with no action (mounts, redirects) are skipped.
       def routes_by_action(klass)
-        grouped_routes(klass).transform_values { |list| list.first(MAX_ITEMS).map { |route| route_data(route) } }
+        grouped_routes(klass).transform_values { |list| list.first(MAX_ITEMS).map { |entry| route_data(entry) } }
       end
 
       def grouped_routes(klass)
-        path = klass.controller_path
-        matching = self.class.rails_routes.select { |route| route.defaults[:controller].to_s == path }
-        matching.group_by { |route| route.defaults[:action].to_s }.reject { |action, _| action.empty? }
+        entries = controller_entries(klass.controller_path)
+        entries.group_by { |entry| entry.route.defaults[:action].to_s }.reject { |action, _| action.empty? }
+      end
+
+      def controller_entries(path)
+        RouteEntries.call(self.class.rails_routes)
+                    .select { |entry| entry.route.defaults[:controller].to_s == path }
       end
 
       # Differenced against the controller's full action_methods set, not the
@@ -128,19 +121,17 @@ module Coatepec
       # have every route whose action fell past the truncation point reported
       # here as a false positive, in the field the README calls the tool's
       # most actionable output. Bounded to MAX_ITEMS like every other
-      # collection in this payload; `grouped_routes` itself caps each route
+      # collection in this payload; `routes_by_action` itself caps each route
       # *list* but not its key count, so this is where that cap belongs.
       def routes_without_action(klass, routes)
         defined_actions = klass.action_methods.map(&:to_s)
         (routes.keys - defined_actions).sort.first(MAX_ITEMS)
       end
 
-      # path keeps Rails' raw spec, `(.:format)` suffix included, so a path
-      # string here is byte-identical to the same route as reported by
-      # rails_routes. Stripping it would make the two tools disagree about the
-      # same route.
-      def route_data(route)
-        { verb: route.verb.to_s, path: route.path.spec.to_s, route_name: route.name&.to_s }
+      # path and engine come off the entry, so they are byte-identical to rails_routes' values for the
+      # same route. An engine route's name is engine-local: reach it as `<mount name>.<route_name>_path`.
+      def route_data(entry)
+        { verb: entry.route.verb.to_s, path: entry.path, route_name: entry.route.name&.to_s, engine: entry.engine }
       end
 
       # Isolated as a class method purely so unit tests can stub it without

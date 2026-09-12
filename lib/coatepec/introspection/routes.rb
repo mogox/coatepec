@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
+require_relative "route_entries"
+
 module Coatepec
   module Introspection
-    # Returns a bounded, filterable list of the target Rails app's routes,
-    # for the rails_routes MCP tool. Reads Rails.application.routes.routes
-    # only -- no console, no request dispatch.
+    # Returns a bounded, filterable list of the target app's routes, mounted-engine routes
+    # included, for the rails_routes MCP tool. Reads route tables only -- no console, no dispatch.
     class Routes
       MAX_LIMIT = 200
       DEFAULT_LIMIT = 50
@@ -36,16 +37,21 @@ module Coatepec
       end
 
       def all_items
-        self.class.rails_routes.map do |route|
-          defaults = route.defaults
-          {
-            name: route.name&.to_s,
-            verb: route.verb.to_s,
-            path: route.path.spec.to_s,
-            controller: defaults[:controller]&.to_s,
-            action: defaults[:action]&.to_s
-          }
-        end
+        RouteEntries.call(self.class.rails_routes).map { |entry| item_for(entry) }
+      end
+
+      # path comes off the entry: for an engine route it already carries the mount prefix.
+      def item_for(entry)
+        route = entry.route
+        defaults = route.defaults
+        {
+          name: route.name&.to_s,
+          verb: route.verb.to_s,
+          path: entry.path,
+          controller: defaults[:controller]&.to_s,
+          action: defaults[:action]&.to_s,
+          engine: entry.engine
+        }
       end
 
       # Isolated as a class method purely so unit tests can stub it without

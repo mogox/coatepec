@@ -14,6 +14,18 @@ RSpec.describe Coatepec::Introspection::Routes do
     allow(described_class).to receive(:rails_routes).and_return(routes)
   end
 
+  # Only a ::Rails::Engine subclass is expanded, so the fake needs a stand-in base class.
+  before { stub_const("Rails::Engine", Class.new) }
+
+  # Rails hands back the engine class itself, whose .routes is a RouteSet wrapping its own routes.
+  def engine_class(name, inner_routes)
+    route_set = double(routes: inner_routes)
+    Class.new(Rails::Engine) do
+      define_singleton_method(:name) { name }
+      define_singleton_method(:routes) { route_set }
+    end
+  end
+
   it "maps route fields including controller/action from defaults" do
     routes = [FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" })]
     stub_routes(routes)
@@ -21,7 +33,8 @@ RSpec.describe Coatepec::Introspection::Routes do
     result = described_class.new.call
 
     expect(result[:items]).to eq(
-      [{ name: "widgets", verb: "GET", path: "/widgets(.:format)", controller: "widgets", action: "index" }]
+      [{ name: "widgets", verb: "GET", path: "/widgets(.:format)", controller: "widgets", action: "index",
+         engine: nil }]
     )
     expect(result[:matched]).to eq(1)
   end
@@ -49,6 +62,37 @@ RSpec.describe Coatepec::Introspection::Routes do
     expect(result[:matched]).to eq(5)
     expect(result[:limit]).to eq(2)
     expect(result[:offset]).to eq(1)
+  end
+
+  it "reports routes mounted inside an engine, tagged with the engine name" do
+    inner = FakeRoute.new("audits", "GET", "/audits(.:format)",
+                          { controller: "widget_admin/audits", action: "index" })
+    engine = engine_class("WidgetAdmin::Engine", [inner])
+    mount = double(name: "widget_admin", verb: "", path: double(spec: "/widget_admin"), defaults: {},
+                   app: double(engine?: true, rack_app: engine))
+    stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" }),
+                 mount])
+
+    result = described_class.new.call
+
+    expect(result[:items].last).to eq(
+      { name: "audits", verb: "GET", path: "/widget_admin/audits(.:format)",
+        controller: "widget_admin/audits", action: "index", engine: "WidgetAdmin::Engine" }
+    )
+  end
+
+  # The query filter searches every value of an item, so the engine name is
+  # matchable for free -- no special-casing needed for "show me engine X".
+  it "matches on the engine field when a query is given" do
+    engine = engine_class("WidgetAdmin::Engine", [FakeRoute.new("audits", "GET", "/audits(.:format)", {})])
+    stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" }),
+                 double(name: nil, verb: "", path: double(spec: "/widget_admin"), defaults: {},
+                        app: double(engine?: true, rack_app: engine))])
+
+    result = described_class.new(query: "widgetadmin").call
+
+    expect(result[:matched]).to eq(1)
+    expect(result[:items].map { |r| r[:engine] }).to eq(["WidgetAdmin::Engine"])
   end
 
   it "caps limit at 200 even if a larger value is requested" do
