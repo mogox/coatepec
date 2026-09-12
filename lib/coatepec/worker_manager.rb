@@ -20,10 +20,13 @@ module Coatepec
       dispatch("status", {}, timeout: 30)
     end
 
-    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:)
+    # rubocop:disable Metrics/ParameterLists -- mirrors rails_spec_run's inputs, like Spec::Runner#run
+    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:, include_passing: false)
+      # rubocop:enable Metrics/ParameterLists
       dispatch(
         "spec_run",
-        { paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds },
+        { paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
+          include_passing: include_passing },
         timeout: timeout_seconds + 10
       )
     end

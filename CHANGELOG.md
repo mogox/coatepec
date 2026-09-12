@@ -5,6 +5,13 @@
 - Tool responses are now compact JSON rather than pretty-printed (22-32%
   smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
   process to restore indentation.
+- `rails_spec_run` and `rails_test_run` now omit passing examples from
+  `examples` by default -- a 49-test green run drops from ~3,700 tokens to
+  ~160 -- and `summary` gains `pending_count`. Pass the new
+  `include_passing: true` input to get the full roster back.
+  `rails_spec_flaky_check` is unaffected: it still sees every example.
+- `examples[].description` (and `flaky_examples[].description`) is omitted
+  when it would only repeat `id`, which is always the case for Minitest.
 - `rails_routes` and `rails_controller` now include the routes of engines
   mounted in the application, expanded one level deep (an engine mounted
   inside another engine stays an opaque mount route, the same boundary

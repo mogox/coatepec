@@ -130,7 +130,7 @@ a no-op.
 
 | Tool | Input | Notes |
 |---|---|---|
-| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream |
+| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?` | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; returns `summary` counts plus only the failed/pending `examples`, pass `include_passing: true` for the full roster |
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
@@ -256,6 +256,8 @@ routes` (and therefore `rails_routes`) draws.
   `rails_spec_run` already has), and each round samples a different subset,
   since execution order varies by design -- for suites this large, narrow
   `paths`/`example` rather than passing a very broad directory selection.
+- `description` is only present when it differs from `id` (RSpec); Minitest
+  entries carry `id` only.
 - `statuses[]` only aligns positionally with `rounds[]` when no round
   crashed -- a round whose process itself failed contributes no entry to
   `statuses[]` (though it still appears in `rounds[]`), so treat positional
