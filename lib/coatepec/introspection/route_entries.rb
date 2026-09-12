@@ -50,8 +50,12 @@ module Coatepec
         prefix = mount_prefix(route)
         name = engine_name(rack_app)
         inner_routes(rack_app).reject { |inner| internal?(inner) }.map do |inner|
-          # squeeze collapses the double slash an engine mounted at "/" makes.
-          Entry.new(inner, (prefix + inner.path.spec.to_s).squeeze("/"), name)
+          # chomp collapses the double slash an engine mounted at "/" makes,
+          # and only that one: every inner spec already starts with "/", so
+          # the junction is the sole place a "//" can appear. Squeezing the
+          # joined string instead would also rewrite a "//" the route spec
+          # legitimately carries elsewhere.
+          Entry.new(inner, prefix.chomp("/") + inner.path.spec.to_s, name)
         end
       end
 
@@ -73,16 +77,23 @@ module Coatepec
       # An anonymous engine (Class.new(::Rails::Engine) mounted directly) has a
       # nil name, which would make its routes indistinguishable from
       # application ones and break the "non-nil engine means engine route"
-      # invariant, so it falls back to #inspect -- the same fallback Rails'
-      # RouteWrapper#endpoint uses for an unnamed endpoint.
+      # invariant, so it falls back to a fixed label. Not #inspect: that
+      # yields an object address that changes every boot -- and, on an
+      # arbitrary object, dumps its ivars -- so nothing here ever serialises
+      # an app object's #inspect or #to_s (Controller#filter_description
+      # substitutes "(block)" for a Proc for the same reason).
       def engine_name(rack_app)
         name = rack_app.is_a?(Class) ? rack_app.name : rack_app.class.name
-        name || rack_app.inspect
+        name || "(anonymous engine)"
       end
 
       # An engine's .routes is an ActionDispatch::Routing::RouteSet, whose own
       # .routes is the enumerable of Journey routes. Anything else mounted
       # under an engine-shaped app is left unflattened rather than raising.
+      #
+      # The first guard is belt-and-braces for the unit specs' fakes: a real
+      # Rails mount that answers `engine?` is a ::Rails::Engine subclass, which
+      # always responds to `routes`, so only a hand-built double can reach it.
       def inner_routes(rack_app)
         return [] unless rack_app.respond_to?(:routes)
 

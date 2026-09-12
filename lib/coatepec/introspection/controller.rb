@@ -8,8 +8,8 @@ module Coatepec
     # for the rails_controller MCP tool. Pure reflection over an already-loaded,
     # already-gated class -- no request dispatch, no action execution, and no
     # evaluation of app-authored callback conditions.
-    # rubocop:disable Metrics/ClassLength -- Task 3 (route cross-referencing)
-    # adds genuinely cohesive functionality: routes_by_action, grouped_routes,
+    # rubocop:disable Metrics/ClassLength -- route cross-referencing adds
+    # genuinely cohesive functionality: routes_by_action, grouped_routes,
     # controller_entries, route_data, and rails_routes exist solely to serve
     # this class's single responsibility (reflect on one controller).
     # Splitting them into a separate collaborator class would fragment that
@@ -134,7 +134,7 @@ module Coatepec
       # have every route whose action fell past the truncation point reported
       # here as a false positive, in the field the README calls the tool's
       # most actionable output. Bounded to MAX_ITEMS like every other
-      # collection in this payload; `grouped_routes` itself caps each route
+      # collection in this payload; `routes_by_action` itself caps each route
       # *list* but not its key count, so this is where that cap belongs.
       def routes_without_action(klass, routes)
         defined_actions = klass.action_methods.map(&:to_s)
@@ -146,8 +146,15 @@ module Coatepec
       # RouteEntries put there -- the very same string rails_routes reports for
       # that route, so a path here is byte-identical to it. Recomputing either
       # half would make the two tools disagree about the same route.
+      #
+      # `engine` carries the same marker for the same reason: nil for an
+      # application route, the engine's class name otherwise. Without it a
+      # caller cannot tell which of these routes are engine-local, and
+      # route_name is exactly where that matters -- an engine route's name is
+      # relative to its engine, reachable only through the mount's helper
+      # (`<mount name>.<route_name>_path`), never as a top-level one.
       def route_data(entry)
-        { verb: entry.route.verb.to_s, path: entry.path, route_name: entry.route.name&.to_s }
+        { verb: entry.route.verb.to_s, path: entry.path, route_name: entry.route.name&.to_s, engine: entry.engine }
       end
 
       # Isolated as a class method purely so unit tests can stub it without

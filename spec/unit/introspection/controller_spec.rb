@@ -384,7 +384,8 @@ RSpec.describe Coatepec::Introspection::Controller do
 
     it "attaches the matching route to an action" do
       expect(action("index")[:routes])
-        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets" }])
+        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets",
+                  engine: nil }])
     end
 
     it "attaches every route reaching one action" do
@@ -441,8 +442,10 @@ RSpec.describe Coatepec::Introspection::Controller do
       engine_result = described_class.new("ControllerFixtures::EngineAuditsController").call
 
       index = engine_result[:actions].find { |a| a[:name] == "index" }
-      # The mount prefix is on the path, exactly as rails_routes reports it.
-      expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits(.:format)", route_name: "audits" }])
+      # The mount prefix is on the path and `engine` names the engine, exactly
+      # as rails_routes reports the same route.
+      expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits(.:format)", route_name: "audits",
+                                      engine: "WidgetAdmin::Engine" }])
       expect(engine_result[:actions].find { |a| a[:name] == "show" }[:routes].first[:path])
         .to eq("/widget_admin/audits/:id(.:format)")
       expect(engine_result[:unroutable_actions]).to eq(["export"])

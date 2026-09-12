@@ -89,6 +89,9 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     index = result["actions"].find { |a| a["name"] == "index" }
     expect(index["routes"].map { |r| r["verb"] }).to eq(["GET"])
     expect(index["routes"].first["path"]).to eq("/widgets(.:format)")
+    # An application route carries a null engine, the same marker rails_routes
+    # reports for it.
+    expect(index["routes"].first["engine"]).to be_nil
 
     update = result["actions"].find { |a| a["name"] == "update" }
     expect(update["routes"].map { |r| r["verb"] }).to contain_exactly("PATCH", "PUT")
@@ -116,9 +119,11 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
 
     index = result["actions"].find { |a| a["name"] == "index" }
     # The mount point is on the path, so this is byte-identical to the same
-    # route's path from rails_routes.
+    # route's path from rails_routes, and `engine` names the engine it came
+    # from rather than leaving it to be mistaken for an application route.
     expect(index["routes"])
-      .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits(.:format)", "route_name" => "audits" }])
+      .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits(.:format)", "route_name" => "audits",
+                "engine" => "WidgetAdmin::Engine" }])
 
     show = result["actions"].find { |a| a["name"] == "show" }
     expect(show["routes"].first["path"]).to eq("/widget_admin/audits/:id(.:format)")

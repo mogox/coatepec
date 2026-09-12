@@ -82,20 +82,20 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     expect(entries.last.engine).not_to eq("Class")
   end
 
-  it "names an anonymous engine class with a non-nil fallback" do
+  it "names an anonymous engine class with a fixed, deterministic fallback" do
     # Class.new(::Rails::Engine) mounted directly has no constant, so .name is
     # nil. A nil here would make the engine's routes indistinguishable from
     # application ones, breaking the "non-nil engine means engine route"
-    # invariant every consumer reads.
+    # invariant every consumer reads. The label is fixed rather than derived
+    # from the object, so it does not change from one boot to the next.
     engine = engine_class(nil, [route("/audits(.:format)")])
 
     entries = described_class.call([mount("/anon(.:format)", rack_app: engine)])
 
-    expect(entries.last.engine).to be_a(String)
-    expect(entries.last.engine).not_to be_empty
+    expect(entries.last.engine).to eq("(anonymous engine)")
   end
 
-  it "squeezes the duplicate slash of an engine mounted at the root" do
+  it "collapses the duplicate slash of an engine mounted at the root" do
     engine = engine_class("WidgetAdmin::Engine", [route("/audits(.:format)")])
 
     entries = described_class.call([mount("/", rack_app: engine)])
@@ -106,10 +106,11 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
   it "drops internal routes inside a mounted engine" do
     inner = route("/audits(.:format)", internal: false)
     engine = engine_class("WidgetAdmin::Engine", [route("/internal(.:format)", internal: true), inner])
+    mount_route = mount("/widget_admin(.:format)", rack_app: engine)
 
-    entries = described_class.call([mount("/widget_admin(.:format)", rack_app: engine)])
+    entries = described_class.call([mount_route])
 
-    expect(entries.map(&:route)).to eq([entries.first.route, inner])
+    expect(entries.map(&:route)).to eq([mount_route, inner])
     expect(entries.map(&:path)).to eq(["/widget_admin(.:format)", "/widget_admin/audits(.:format)"])
   end
 
