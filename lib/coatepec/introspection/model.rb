@@ -159,14 +159,15 @@ module Coatepec
         nil
       end
 
+      # Rails instantiates one validator per declaration; a concern and the model body often declare the same one.
       def validators_for(klass)
-        klass.validators.first(MAX_ITEMS).map do |validator|
+        klass.validators.map do |validator|
           {
             name: validator.class.name,
             attributes: validator.attributes.map(&:to_s),
             options: SafeOptions.call(validator.options)
           }
-        end
+        end.uniq.first(MAX_ITEMS)
       end
 
       def enums_for(klass)

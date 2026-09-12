@@ -53,6 +53,10 @@
   path on a Minitest-only app reports `invalid_spec_path` instead of
   `unsupported_test_framework`. `invalid_spec_path` keeps its code for both
   frameworks.
+- `rails_model` collapses validators with identical name, attributes and
+  options into one entry (a concern and the model body declaring the same
+  validation used to appear twice); the 200-item cap now counts distinct
+  validators.
 
 ## 0.7.0
 
