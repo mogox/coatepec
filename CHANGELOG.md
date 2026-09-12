@@ -2,6 +2,9 @@
 
 ## 0.8.0
 
+- Tool responses are now compact JSON rather than pretty-printed (22-32%
+  smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
+  process to restore indentation.
 - `rails_routes` and `rails_controller` now include the routes of engines
   mounted in the application, expanded one level deep (an engine mounted
   inside another engine stays an opaque mount route, the same boundary

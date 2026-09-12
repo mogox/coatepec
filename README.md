@@ -75,6 +75,11 @@ macos_fork_unsafe_gems: [some_gem]   # extends the built-in fork-unsafe denylist
 A missing file means every setting takes its default -- this file is never
 required.
 
+Tool responses are compact JSON -- no indentation, nothing downstream reads
+it. Set `COATEPEC_PRETTY=1` in the MCP server's `env` (the same place as
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY` in the JSON example below) to
+pretty-print them when you are reading the sidecar by hand.
+
 ### macOS fork (experimental, opt-in)
 
 On macOS, `rails_spec_run` normally spawns a fresh `bundle exec rspec`
