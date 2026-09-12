@@ -14,8 +14,8 @@ module Coatepec
 
       module_function
 
-      # rubocop:disable Metrics/ParameterLists -- the child's identity, its two
-      # captured pipes and its JSON summary are one indivisible input set.
+      # rubocop:disable Metrics/ParameterLists -- the child's identity, pipes and JSON summary are
+      # one indivisible input set; the sixth keyword, include_passing, is pinned by the tool's input contract.
       def build(pid:, status:, out_r:, err_r:, json_path:, include_passing: false)
         # rubocop:enable Metrics/ParameterLists
         stdout_result = read_bounded(out_r)

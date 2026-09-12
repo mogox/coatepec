@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require "tempfile"
+require "fileutils"
+require "securerandom"
+require "tmpdir"
 
 RSpec.describe Coatepec::Spec::Result do
   # A finished, zero-exit child: Process::Status cannot be built by hand, so run a real one.
   let(:status) { Process.wait2(Process.spawn("true")).last }
+  let(:tmpdir) { Dir.mktmpdir("coatepec-result") }
+
+  after { FileUtils.remove_entry(tmpdir) }
 
   def summary_file(examples, pending_count: 0)
     doc = {
@@ -13,7 +18,7 @@ RSpec.describe Coatepec::Spec::Result do
                  pending_count: pending_count, duration: 0.5 },
       examples: examples
     }
-    path = Tempfile.create(["summary", ".json"], &:path)
+    path = File.join(tmpdir, "summary-#{SecureRandom.hex(4)}.json")
     File.write(path, JSON.generate(doc))
     path
   end
@@ -29,6 +34,8 @@ RSpec.describe Coatepec::Spec::Result do
     described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r,
                           json_path: summary_file(examples, **opts.slice(:pending_count)),
                           **opts.slice(:include_passing))
+  ensure
+    [out_r, err_r].compact.each(&:close)
   end
 
   it "omits passing examples by default, keeping failed and pending ones" do
@@ -49,6 +56,14 @@ RSpec.describe Coatepec::Spec::Result do
     result = build(examples)
 
     expect(result[:examples].map { |e| e[:id] }).to eq(["f"])
+  end
+
+  it "applies the 500 cap to the kept examples when include_passing is true" do
+    examples = (1..600).map { |i| example("p#{i}", "passed") }
+
+    result = build(examples, include_passing: true)
+
+    expect(result[:examples].size).to eq(500)
   end
 
   it "omits description when it equals id and keeps it when it differs" do
