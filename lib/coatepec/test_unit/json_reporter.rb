@@ -53,6 +53,7 @@ module Coatepec
           summary: {
             example_count: @examples.size,
             failure_count: @examples.count { |e| e[:status] == "failed" },
+            pending_count: @examples.count { |e| e[:status] == "pending" },
             duration: @started_at ? ::Minitest.clock_time - @started_at : 0.0
           },
           examples: @examples

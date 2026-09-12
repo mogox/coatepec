@@ -53,6 +53,7 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
     )
 
     expect(doc["examples"].map { |e| e["status"] }).to eq(%w[failed failed pending])
+    expect(doc["summary"]["pending_count"]).to eq(1)
   end
 
   it "counts failed tests, not failure objects, and reports wall-clock duration" do
@@ -60,6 +61,7 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
 
     expect(doc["summary"]["example_count"]).to eq(2)
     expect(doc["summary"]["failure_count"]).to eq(1)
+    expect(doc["summary"]["pending_count"]).to eq(0)
     expect(doc["summary"]["duration"]).to be_a(Float)
   end
 
@@ -82,9 +84,10 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
     run_reporter(result("test_a", 1))
     summary = Coatepec::Spec::Result.read_summary(json_path)
 
-    expect(Coatepec::Spec::Result.summary_fields(summary)).to include(example_count: 1, failure_count: 0)
+    expect(Coatepec::Spec::Result.summary_fields(summary))
+      .to include(example_count: 1, failure_count: 0, pending_count: 0)
     expect(Coatepec::Spec::Result.example_fields(summary["examples"].first))
-      .to eq(id: "WidgetTest#test_a", description: "WidgetTest#test_a", status: "passed",
+      .to eq(id: "WidgetTest#test_a", status: "passed",
              file_path: "./test/models/widget_test.rb", line_number: 1)
   end
 end
