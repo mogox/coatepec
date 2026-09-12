@@ -109,6 +109,26 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     expect(index["routes"].first["path"]).to eq("/admin/reports(.:format)")
   end
 
+  it "cross-references a controller inside a mounted engine against the engine's own routes" do
+    result = result_for("WidgetAdmin::AuditsController")
+
+    expect(result["controller_path"]).to eq("widget_admin/audits")
+
+    index = result["actions"].find { |a| a["name"] == "index" }
+    # The mount point is on the path, so this is byte-identical to the same
+    # route's path from rails_routes.
+    expect(index["routes"])
+      .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits(.:format)", "route_name" => "audits" }])
+
+    show = result["actions"].find { |a| a["name"] == "show" }
+    expect(show["routes"].first["path"]).to eq("/widget_admin/audits/:id(.:format)")
+
+    # The engine routes index/show only, so `export` is genuinely unroutable
+    # -- it must not be swept up by the engine's routes now being visible.
+    expect(result["unroutable_actions"]).to eq(["export"])
+    expect(result["routes_without_action"]).to eq([])
+  end
+
   it "reports app concerns without framework modules, including one inherited from ApplicationController" do
     concerns = result_for("WidgetsController")["concerns"]
 
