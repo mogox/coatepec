@@ -17,10 +17,8 @@ module Coatepec
         @rails_runtime = rails_runtime
       end
 
-      # rubocop:disable Metrics/ParameterLists -- mirrors rails_spec_run's inputs
       def run(paths:, example: nil, seed: nil, fail_fast: false, timeout_seconds: DEFAULT_TIMEOUT,
               include_passing: false)
-        # rubocop:enable Metrics/ParameterLists
         validated = @path_policy.validate!(paths)
         adapter = adapter_for(validated[:framework])
         adapter.require_framework!

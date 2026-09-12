@@ -27,12 +27,8 @@ module Coatepec
       input_schema(**INPUT_SCHEMA)
 
       class << self
-        # rubocop:disable Metrics/ParameterLists -- mirrors the tool's own input_schema
-        # (paths/example/seed/fail_fast/timeout_seconds/include_passing) plus the MCP-framework-injected
-        # server_context; splitting it would fight the ::MCP::Tool#call contract.
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
                  include_passing: false)
-          # rubocop:enable Metrics/ParameterLists
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,

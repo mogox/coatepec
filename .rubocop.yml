@@ -15,6 +15,11 @@ Style/StringLiterals:
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
 
+Metrics/ParameterLists:
+  # Keyword-only signatures here mirror the MCP tools' input schemas, and a tool
+  # gaining an input shouldn't force a refactor; positional lists stay capped at 5.
+  CountKeywordArgs: false
+
 Metrics/BlockLength:
   # RSpec's describe/context/it DSL naturally produces long blocks; this is the
   # standard exclusion used by rubocop-rspec's own default config. inherit_mode
