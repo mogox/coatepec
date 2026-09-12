@@ -18,6 +18,9 @@ require "rails/test_unit/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# A minimal mounted engine so specs can assert engine-route traversal.
+require_relative "../engines/widget_admin/lib/widget_admin"
+
 module RailsApp
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.

@@ -14,6 +14,8 @@ Rails.application.routes.draw do
     resources :reports, only: [:index]
   end
 
+  mount WidgetAdmin::Engine, at: "/widget_admin"
+
   # Defines the root path route ("/")
   # root "posts#index"
 end
