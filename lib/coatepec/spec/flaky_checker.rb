@@ -44,9 +44,10 @@ module Coatepec
 
       def run_one_round(paths, example, timeout_seconds)
         seed = SecureRandom.random_number(65_536)
+        # Every round needs the full roster: a pass in one round is what makes a later failure flaky.
         result = @runner.run(
           paths: paths, example: example, seed: seed, fail_fast: false,
-          timeout_seconds: timeout_seconds
+          timeout_seconds: timeout_seconds, include_passing: true
         )
         { seed: seed, status: result[:status], examples: result[:examples] }
       end

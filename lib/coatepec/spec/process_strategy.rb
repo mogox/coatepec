@@ -19,7 +19,7 @@ module Coatepec
         @rails_runtime = rails_runtime
       end
 
-      def run(args, timeout_seconds)
+      def run(args, timeout_seconds, include_passing: false)
         out_r, out_w = IO.pipe
         err_r, err_w = IO.pipe
         json_path = Tempfile.create(["coatepec-rspec", ".json"], &:path)
@@ -27,7 +27,7 @@ module Coatepec
         pid = start_or_release(args, out_w, err_w, json_path, [out_r, err_r])
         [out_w, err_w].each(&:close)
 
-        reap(pid, out_r, err_r, timeout_seconds, json_path)
+        reap(pid, [out_r, err_r], timeout_seconds, json_path, include_passing)
       end
 
       private
@@ -51,9 +51,11 @@ module Coatepec
         raise
       end
 
-      def reap(pid, out_r, err_r, timeout_seconds, json_path)
+      def reap(pid, pipes, timeout_seconds, json_path, include_passing)
+        out_r, err_r = pipes
         status = wait_with_timeout(pid, timeout_seconds)
-        result = Result.build(pid: pid, status: status, out_r: out_r, err_r: err_r, json_path: json_path)
+        result = Result.build(pid: pid, status: status, out_r: out_r, err_r: err_r, json_path: json_path,
+                              include_passing: include_passing)
         [out_r, err_r].each(&:close)
         result
       ensure

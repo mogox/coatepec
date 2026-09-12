@@ -27,11 +27,27 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     expect(result["exit_code"]).to eq(0)
     expect(result["summary"]["example_count"]).to eq(1)
     expect(result["summary"]["failure_count"]).to eq(0)
-    expect(result["examples"].first["status"]).to eq("passed")
+    expect(result["summary"]["pending_count"]).to eq(0)
+    expect(result["examples"]).to eq([])
     # Regression guard: RSpec's progress-formatter output must land on the
     # child's *stdout* pipe, not leak into stderr or the protocol fd.
     expect(result["stdout"]).to include("1 example, 0 failures")
     expect(result["stdout_truncated"]).to be(false)
+  end
+
+  it "returns passing examples when include_passing is true" do
+    stdout, stderr, status = run_in_worker(<<~RUBY)
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect})
+                                     .run(paths: ["spec/passing_spec.rb"], include_passing: true)
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["examples"].first["status"]).to eq("passed")
+    # RSpec's full_description differs from the example id, so it survives the trim.
+    expect(result["examples"].first["description"]).to eq("passing fixture passes")
   end
 
   it "runs a spec that requires rails_helper against the warm Rails boot" do
