@@ -10,7 +10,10 @@ module Coatepec
     # #load_engines_routes, which is what `bin/rails routes` shows: engines are
     # expanded one level only (an engine mounted inside an engine stays an
     # opaque mount route), and routes flagged `internal` -- Rails' own
-    # /rails/info and friends -- are dropped at both levels.
+    # /rails/info and friends -- are dropped at both levels. It diverges on one
+    # point: Rails keys engines by endpoint, so an engine mounted at two paths
+    # is listed once, whereas this emits that engine's routes under both mount
+    # prefixes, because each prefixed path is a real, reachable URL.
     #
     # Every attribute beyond `path` is reached through a respond_to? guard.
     # Unit specs feed this class plain Structs and doubles standing in for
@@ -52,8 +55,10 @@ module Coatepec
         end
       end
 
-      # The mount's own path carries the format suffix that its inner routes
-      # supply for themselves, so it is stripped before prefixing.
+      # Defensive strip: ActionDispatch::Routing::Mapper#mount defaults to
+      # `format: false`, so a real mount spec does not carry the `(.:format)`
+      # suffix -- but a mount declared with `format: true` would, and the inner
+      # routes supply their own suffix, so it must not survive into the prefix.
       def mount_prefix(route)
         route.path.spec.to_s.sub(/\(\.:format\)\z/, "")
       end
@@ -64,8 +69,15 @@ module Coatepec
 
       # rack_app IS the engine class (not an instance of it), so its own .name
       # is the engine name -- .class.name here would yield "Class".
+      #
+      # An anonymous engine (Class.new(::Rails::Engine) mounted directly) has a
+      # nil name, which would make its routes indistinguishable from
+      # application ones and break the "non-nil engine means engine route"
+      # invariant, so it falls back to #inspect -- the same fallback Rails'
+      # RouteWrapper#endpoint uses for an unnamed endpoint.
       def engine_name(rack_app)
-        rack_app.is_a?(Class) ? rack_app.name : rack_app.class.name
+        name = rack_app.is_a?(Class) ? rack_app.name : rack_app.class.name
+        name || rack_app.inspect
       end
 
       # An engine's .routes is an ActionDispatch::Routing::RouteSet, whose own

@@ -82,6 +82,19 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     expect(entries.last.engine).not_to eq("Class")
   end
 
+  it "names an anonymous engine class with a non-nil fallback" do
+    # Class.new(::Rails::Engine) mounted directly has no constant, so .name is
+    # nil. A nil here would make the engine's routes indistinguishable from
+    # application ones, breaking the "non-nil engine means engine route"
+    # invariant every consumer reads.
+    engine = engine_class(nil, [route("/audits(.:format)")])
+
+    entries = described_class.call([mount("/anon(.:format)", rack_app: engine)])
+
+    expect(entries.last.engine).to be_a(String)
+    expect(entries.last.engine).not_to be_empty
+  end
+
   it "squeezes the duplicate slash of an engine mounted at the root" do
     engine = engine_class("WidgetAdmin::Engine", [route("/audits(.:format)")])
 
