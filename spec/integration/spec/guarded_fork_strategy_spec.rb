@@ -43,13 +43,13 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy, type: :integration do
       adapter = Coatepec::TestUnit::Adapter.new(#{FIXTURE_APP_ROOT.inspect})
       forked = Coatepec::Spec::GuardedForkStrategy
                  .new(#{FIXTURE_APP_ROOT.inspect}, adapter: adapter, project: project, rails_runtime: runtime)
-                 .run(["test/models/passing_test.rb:9"], 30)
+                 .run(["test/models/passing_test.rb:9"], 30, include_passing: true)
       fake_runtime = Object.new
       def fake_runtime.post_boot_thread_count = -1
       def fake_runtime.loaded_gem_names = []
       spawned = Coatepec::Spec::GuardedForkStrategy
                   .new(#{FIXTURE_APP_ROOT.inspect}, adapter: adapter, project: project, rails_runtime: fake_runtime)
-                  .run(["test/models/passing_test.rb:9"], 30)
+                  .run(["test/models/passing_test.rb:9"], 30, include_passing: true)
       puts JSON.generate(forked: forked, spawned: spawned)
     RUBY
 
@@ -134,9 +134,9 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy, type: :integration do
         module Spec
           class SpawnStrategy
             alias_method :run_without_spy, :run
-            def run(args, timeout_seconds)
+            def run(args, timeout_seconds, **options)
               $observed_timeout = timeout_seconds
-              run_without_spy(args, timeout_seconds)
+              run_without_spy(args, timeout_seconds, **options)
             end
           end
         end

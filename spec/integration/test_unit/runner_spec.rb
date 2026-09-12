@@ -29,16 +29,22 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
     expect(result["status"]).to eq("passed"), result["stderr"]
     expect(result["exit_code"]).to eq(0)
     expect(result["summary"]).to include("example_count" => 2, "failure_count" => 0)
-    expect(result["examples"].map { |e| e["id"] })
-      .to contain_exactly("PassingTest#test_adds", "PassingTest#test_reaches_the_database")
-    expect(result["examples"].map { |e| e["file_path"] }.uniq).to eq(["./test/models/passing_test.rb"])
-    expect(result["examples"].map { |e| e["status"] }.uniq).to eq(["passed"])
+    expect(result["examples"]).to eq([])
     # Rails' own reporter output lands on the child's stdout pipe.
     expect(result["stdout"]).to include("2 runs, 2 assertions, 0 failures")
+
+    with_passing = run_runner('paths: ["test/models/passing_test.rb"], include_passing: true')
+
+    expect(with_passing["examples"].map { |e| e["id"] })
+      .to contain_exactly("PassingTest#test_adds", "PassingTest#test_reaches_the_database")
+    expect(with_passing["examples"].map { |e| e["file_path"] }.uniq).to eq(["./test/models/passing_test.rb"])
+    expect(with_passing["examples"].map { |e| e["status"] }.uniq).to eq(["passed"])
+    # Minitest's description is its id, so it is never repeated on the example.
+    expect(with_passing["examples"].map { |e| e.key?("description") }.uniq).to eq([false])
   end
 
   it "selects a single test by file:LINE" do
-    result = run_runner('paths: ["test/models/passing_test.rb:9"]')
+    result = run_runner('paths: ["test/models/passing_test.rb:9"], include_passing: true')
 
     expect(result["status"]).to eq("passed"), result["stderr"]
     expect(result["examples"].map { |e| e["id"] }).to eq(["PassingTest#test_reaches_the_database"])
@@ -52,7 +58,7 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
   end
 
   it "selects by example substring" do
-    result = run_runner('paths: ["test/models/passing_test.rb"], example: "reaches the"')
+    result = run_runner('paths: ["test/models/passing_test.rb"], example: "reaches the", include_passing: true')
 
     expect(result["examples"].map { |e| e["id"] }).to eq(["PassingTest#test_reaches_the_database"])
   end

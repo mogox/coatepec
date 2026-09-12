@@ -75,6 +75,11 @@ macos_fork_unsafe_gems: [some_gem]   # extends the built-in fork-unsafe denylist
 A missing file means every setting takes its default -- this file is never
 required.
 
+Tool responses are compact JSON -- no indentation, nothing downstream reads
+it. Set `COATEPEC_PRETTY=1` in the MCP server's `env` (the same place as
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY` in the JSON example below) to
+pretty-print them when you are reading the sidecar by hand.
+
 ### macOS fork (experimental, opt-in)
 
 On macOS, `rails_spec_run` normally spawns a fresh `bundle exec rspec`
@@ -125,11 +130,11 @@ a no-op.
 
 | Tool | Input | Notes |
 |---|---|---|
-| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream |
+| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?` | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; returns `summary` counts plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples) |
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 50), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes` |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
@@ -162,6 +167,8 @@ a no-op.
   prefixed path, since each of those paths is a real, reachable URL.
   `bin/rails routes` keys engines by endpoint and so lists such an engine
   only once.
+- Paging: when `next_offset` is not `null`, call again with
+  `offset: next_offset` to get the next page.
 
 `rails_model`:
 
@@ -251,6 +258,8 @@ routes` (and therefore `rails_routes`) draws.
   `rails_spec_run` already has), and each round samples a different subset,
   since execution order varies by design -- for suites this large, narrow
   `paths`/`example` rather than passing a very broad directory selection.
+- `description` is only present when it differs from `id` (RSpec); Minitest
+  entries carry `id` only.
 - `statuses[]` only aligns positionally with `rounds[]` when no round
   crashed -- a round whose process itself failed contributes no entry to
   `statuses[]` (though it still appears in `rounds[]`), so treat positional

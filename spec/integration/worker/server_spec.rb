@@ -64,7 +64,8 @@ RSpec.describe "coatepec-worker executable", type: :integration do
   it "answers a spec_run command for a Minitest test path through the same worker" do
     @pid, protocol = spawn_worker
 
-    protocol.write(id: 1, command: "spec_run", args: { paths: ["test/models/passing_test.rb:9"] })
+    protocol.write(id: 1, command: "spec_run",
+                   args: { paths: ["test/models/passing_test.rb:9"], include_passing: true })
     response = protocol.read
 
     expect(response[:ok]).to be(true)

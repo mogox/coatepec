@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Owner < ApplicationRecord
+  include Nameable
+
   has_many :widgets, dependent: :destroy
 
   validates :name, presence: true

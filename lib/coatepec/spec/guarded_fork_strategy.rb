@@ -41,8 +41,8 @@ module Coatepec
         @spawn_strategy = SpawnStrategy.new(project_root, adapter: @adapter)
       end
 
-      def run(args, timeout_seconds)
-        return fallback_result(args, timeout_seconds, "spawn_fallback") unless guard_passes?
+      def run(args, timeout_seconds, include_passing: false)
+        return fallback_result(args, timeout_seconds, "spawn_fallback", include_passing) unless guard_passes?
 
         started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         begin
@@ -53,20 +53,20 @@ module Coatepec
           # caller's side that is indistinguishable from a failed guard, hence
           # the same mode. Opting into macos_fork must never surface an error
           # that plain SpawnStrategy wouldn't have.
-          return fallback_result(args, timeout_seconds, "spawn_fallback")
+          return fallback_result(args, timeout_seconds, "spawn_fallback", include_passing)
         end
         return result.merge(execution_mode: "fork") unless crashed?(result)
 
-        retry_after_crash(args, timeout_seconds, started_at, result)
+        retry_after_crash(args, timeout_seconds, started_at, result, include_passing)
       end
 
       private
 
-      def retry_after_crash(args, timeout_seconds, started_at, crashed)
+      def retry_after_crash(args, timeout_seconds, started_at, crashed, include_passing)
         elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
         remaining = [timeout_seconds - elapsed, MIN_RETRY_TIMEOUT_SECONDS].max
 
-        fallback_result(args, remaining, "spawn_after_crash")
+        fallback_result(args, remaining, "spawn_after_crash", include_passing)
           .merge(crashed_fork_stderr: crash_diagnostics(crashed))
       end
 
@@ -79,8 +79,8 @@ module Coatepec
         text.byteslice(-MAX_CRASH_STDERR_BYTES, MAX_CRASH_STDERR_BYTES)
       end
 
-      def fallback_result(args, timeout_seconds, mode)
-        @spawn_strategy.run(args, timeout_seconds).merge(execution_mode: mode)
+      def fallback_result(args, timeout_seconds, mode, include_passing)
+        @spawn_strategy.run(args, timeout_seconds, include_passing: include_passing).merge(execution_mode: mode)
       end
 
       def guard_passes?

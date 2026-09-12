@@ -1,0 +1,81 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+require "fileutils"
+require "securerandom"
+require "tmpdir"
+
+RSpec.describe Coatepec::Spec::Result do
+  # A finished, zero-exit child: Process::Status cannot be built by hand, so run a real one.
+  let(:status) { Process.wait2(Process.spawn("true")).last }
+  let(:tmpdir) { Dir.mktmpdir("coatepec-result") }
+
+  after { FileUtils.remove_entry(tmpdir) }
+
+  def summary_file(examples, pending_count: 0)
+    doc = {
+      summary: { example_count: examples.size, failure_count: examples.count { |e| e[:status] == "failed" },
+                 pending_count: pending_count, duration: 0.5 },
+      examples: examples
+    }
+    path = File.join(tmpdir, "summary-#{SecureRandom.hex(4)}.json")
+    File.write(path, JSON.generate(doc))
+    path
+  end
+
+  def example(id, status, description: id, file: "./spec/x_spec.rb", line: 1)
+    { id: id, full_description: description, status: status, file_path: file, line_number: line }
+  end
+
+  def build(examples, **opts)
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    [out_w, err_w].each(&:close)
+    described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r,
+                          json_path: summary_file(examples, **opts.slice(:pending_count)),
+                          **opts.slice(:include_passing))
+  ensure
+    [out_r, err_r].compact.each(&:close)
+  end
+
+  it "omits passing examples by default, keeping failed and pending ones" do
+    result = build([example("a", "passed"), example("b", "failed"), example("c", "pending")])
+
+    expect(result[:examples].map { |e| e[:id] }).to eq(%w[b c])
+  end
+
+  it "keeps every example when include_passing is true" do
+    result = build([example("a", "passed"), example("b", "failed")], include_passing: true)
+
+    expect(result[:examples].map { |e| e[:id] }).to eq(%w[a b])
+  end
+
+  it "applies the 500 cap after dropping passing examples" do
+    examples = (1..600).map { |i| example("p#{i}", "passed") } + [example("f", "failed")]
+
+    result = build(examples)
+
+    expect(result[:examples].map { |e| e[:id] }).to eq(["f"])
+  end
+
+  it "applies the 500 cap to the kept examples when include_passing is true" do
+    examples = (1..600).map { |i| example("p#{i}", "passed") }
+
+    result = build(examples, include_passing: true)
+
+    expect(result[:examples].size).to eq(500)
+  end
+
+  it "omits description when it equals id and keeps it when it differs" do
+    result = build([example("same", "failed"), example("./x[1:1]", "failed", description: "x does y")])
+
+    expect(result[:examples].first).not_to have_key(:description)
+    expect(result[:examples].last[:description]).to eq("x does y")
+  end
+
+  it "reports pending_count in the summary" do
+    result = build([example("c", "pending")], pending_count: 1)
+
+    expect(result[:summary]).to include(example_count: 1, failure_count: 0, pending_count: 1)
+  end
+end

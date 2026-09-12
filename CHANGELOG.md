@@ -2,6 +2,17 @@
 
 ## 0.8.0
 
+- Tool responses are now compact JSON rather than pretty-printed (22-32%
+  smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
+  process to restore indentation.
+- `rails_spec_run` and `rails_test_run` now omit passing examples from
+  `examples` by default -- a 49-test green run drops from ~3,700 tokens to
+  ~160 -- and `summary` gains `pending_count`. Pass the new
+  `include_passing: true` input to get the full roster back (still capped at
+  500 examples). `rails_spec_flaky_check` is unaffected: it still sees every
+  example.
+- `examples[].description` (and `flaky_examples[].description`) is omitted
+  when it would only repeat `id`, which is always the case for Minitest.
 - `rails_routes` and `rails_controller` now include the routes of engines
   mounted in the application, expanded one level deep (an engine mounted
   inside another engine stays an opaque mount route, the same boundary
@@ -43,6 +54,13 @@
   path on a Minitest-only app reports `invalid_spec_path` instead of
   `unsupported_test_framework`. `invalid_spec_path` keeps its code for both
   frameworks.
+- `rails_model` collapses validators with identical name, attributes and
+  options into one entry (a concern and the model body declaring the same
+  validation used to appear twice); the 200-item cap now counts distinct
+  validators.
+- `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
+  roughly doubled route counts) and returns `next_offset` for the follow-up
+  call, `null` on the last page.
 
 ## 0.7.0
 

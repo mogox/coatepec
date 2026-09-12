@@ -20,10 +20,11 @@ module Coatepec
       dispatch("status", {}, timeout: 30)
     end
 
-    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:)
+    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:, include_passing: false)
       dispatch(
         "spec_run",
-        { paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds },
+        { paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
+          include_passing: include_passing },
         timeout: timeout_seconds + 10
       )
     end
@@ -40,7 +41,7 @@ module Coatepec
       )
     end
 
-    def routes(query: nil, limit: 50, offset: 0)
+    def routes(query: nil, limit: 100, offset: 0)
       dispatch("routes", { query: query, limit: limit, offset: offset }, timeout: 30)
     end
 

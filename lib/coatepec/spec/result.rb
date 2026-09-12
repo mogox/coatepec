@@ -4,23 +4,32 @@ require "json"
 
 module Coatepec
   module Spec
-    # Turns a finished RSpec child process's exit status, captured
-    # stdout/stderr (each capped at MAX_OUTPUT_BYTES), and RSpec's own JSON
-    # formatter output into the flat result hash rails_spec_run returns.
+    # Turns a finished test child's exit status, captured output (each capped
+    # at MAX_OUTPUT_BYTES) and the framework's JSON summary into the flat
+    # result hash rails_spec_run returns. Passing examples are omitted unless
+    # include_passing.
     module Result
       MAX_OUTPUT_BYTES = 256 * 1024
+      MAX_EXAMPLES = 500
 
       module_function
 
-      def build(pid:, status:, out_r:, err_r:, json_path:)
+      def build(pid:, status:, out_r:, err_r:, json_path:, include_passing: false)
         stdout_result = read_bounded(out_r)
         stderr_result = read_bounded(err_r)
         summary = read_summary(json_path)
 
         base(pid, status, stdout_result, stderr_result).merge(
           summary: summary && summary_fields(summary),
-          examples: (summary&.fetch("examples", []) || []).first(500).map { |e| example_fields(e) }
+          examples: selected_examples(summary, include_passing).map { |e| example_fields(e) }
         )
+      end
+
+      # Passing examples are dropped before the cap so a large green run never crowds out its failures.
+      def selected_examples(summary, include_passing)
+        examples = summary&.dig("examples") || []
+        examples = examples.reject { |e| e["status"] == "passed" } unless include_passing
+        examples.first(MAX_EXAMPLES)
       end
 
       # rubocop:disable Metrics/MethodLength -- one flat hash literal mapping
@@ -54,18 +63,23 @@ module Coatepec
         {
           example_count: summary.dig("summary", "example_count"),
           failure_count: summary.dig("summary", "failure_count"),
+          pending_count: summary.dig("summary", "pending_count"),
           duration: summary.dig("summary", "duration")
         }
       end
 
+      # description is Minitest's id by construction and RSpec's full_description; only emit it when it adds something.
       def example_fields(example)
-        {
+        description = example["full_description"]
+        fields = {
           id: example["id"],
-          description: example["full_description"],
+          description: description,
           status: example["status"],
           file_path: example["file_path"],
           line_number: example["line_number"]
         }
+        fields.delete(:description) if description.nil? || description == example["id"]
+        fields
       end
 
       def read_bounded(io)

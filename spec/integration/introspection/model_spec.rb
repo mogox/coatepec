@@ -76,6 +76,23 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(in_validator["options"]["in"]).to eq(%w[admin root])
   end
 
+  it "collapses a validation declared by both a concern and the model body into one entry" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      result = Coatepec::Introspection::Model.new("Owner").call
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    # The fixture's Nameable concern and Owner's own body both declare
+    # `validates :name, presence: true` -- two identical validator objects, one entry.
+    presence_validators = result["validators"].select do |v|
+      v["name"] == "ActiveRecord::Validations::PresenceValidator" && v["attributes"] == ["name"]
+    end
+    expect(presence_validators.size).to eq(1)
+  end
+
   it "raises table_not_found for a concrete model whose table does not exist" do
     stdout, stderr, status = run_model_call(<<~RUBY)
       class GhostRecord < ActiveRecord::Base

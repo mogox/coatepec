@@ -214,4 +214,49 @@ RSpec.describe Coatepec::Introspection::Model do
       expect(model.send(:safe_association_data, assoc)).to eq(model.send(:build_association_data, assoc))
     end
   end
+
+  describe "#validators_for (private, unit-level)" do
+    subject(:model) { described_class.new("Whatever") }
+
+    # A Struct rather than an instance_double: `attributes`/`options` aren't
+    # instance methods of a bare Class, so rspec-mocks would reject them.
+    let(:validator_class) { stub_const("FakeValidator", Struct.new(:attributes, :options)) }
+
+    def validator(attributes, options)
+      validator_class.new(attributes, options)
+    end
+
+    it "collapses validators with an identical name, attributes and options into one entry" do
+      klass = double(validators: [validator([:slug], { presence: true }), validator([:slug], { presence: true }),
+                                  validator([:name], { presence: true })])
+
+      entries = model.send(:validators_for, klass)
+
+      expect(entries).to eq([
+                              { name: "FakeValidator", attributes: ["slug"], options: { "presence" => true } },
+                              { name: "FakeValidator", attributes: ["name"], options: { "presence" => true } }
+                            ])
+    end
+
+    # SafeOptions strips Procs and Regexps, so two genuinely different declarations
+    # sanitize to the same triple -- de-duplication has to key on the raw options.
+    it "keeps validators whose options differ only in a Regexp or a Proc" do
+      klass = double(validators: [validator([:email], { with: /@/ }), validator([:email], { with: /\.com\z/ }),
+                                  validator([:name], { presence: true, if: -> { true } }),
+                                  validator([:name], { presence: true, if: -> { false } })])
+
+      entries = model.send(:validators_for, klass)
+
+      expect(entries.size).to eq(4)
+    end
+
+    it "de-duplicates before applying the MAX_ITEMS cap" do
+      klass = double(validators: Array.new(described_class::MAX_ITEMS + 1) { validator([:slug], {}) } +
+                                 [validator([:name], {})])
+
+      entries = model.send(:validators_for, klass)
+
+      expect(entries.map { |v| v[:attributes] }).to eq([["slug"], ["name"]])
+    end
+  end
 end

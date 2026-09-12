@@ -12,7 +12,8 @@ module Coatepec
           example: { type: %w[string null] },
           seed: { type: %w[integer null], minimum: 0, maximum: 65_535 },
           fail_fast: { type: "boolean" },
-          timeout_seconds: { type: "integer", minimum: 1, maximum: 900 }
+          timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
+          include_passing: { type: "boolean" }
         },
         required: ["paths"],
         additionalProperties: false
@@ -20,19 +21,18 @@ module Coatepec
 
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
-                  "against a warm, isolated Rails test worker; the framework is chosen from the selector paths"
+                  "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
+                  "; returns only failed and pending examples unless include_passing is true"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
-        # rubocop:disable Metrics/ParameterLists -- mirrors the tool's own input_schema
-        # (paths/example/seed/fail_fast/timeout_seconds) plus the MCP-framework-injected
-        # server_context; splitting it would fight the ::MCP::Tool#call contract.
-        def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120)
-          # rubocop:enable Metrics/ParameterLists
+        def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
+                 include_passing: false)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
-            paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds
+            paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
+            include_passing: include_passing
           )
           Response.ok(data: data, meta: meta_for(server_context, started_at))
         rescue Coatepec::Error => e
@@ -55,7 +55,8 @@ module Coatepec
     class TestRunTool < SpecRunTool
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
-                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name"
+                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
+                  "; returns only failed and pending examples unless include_passing is true"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
     end
@@ -170,7 +171,9 @@ module Coatepec
       tool_name "rails_routes"
       description "Return a bounded, filterable list of the Rails app's routes, including the routes of mounted " \
                   "engines (one level deep; paths carry the mount point; each item's engine field names the " \
-                  "engine, null for an application route; query also matches the engine field)"
+                  "engine, null for an application route; query also matches the engine field)" \
+                  "; returns up to limit items (default 100) with next_offset -- the offset to pass back " \
+                  "for the next page, null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
@@ -183,7 +186,7 @@ module Coatepec
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 50, offset: 0)
+        def call(server_context:, query: nil, limit: 100, offset: 0)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset)
           Response.ok(data: data, meta: meta_for(server_context, started_at))

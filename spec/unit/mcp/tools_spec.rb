@@ -10,7 +10,8 @@ RSpec.describe "Coatepec MCP tools" do
   describe Coatepec::MCP::SpecRunTool do
     it "returns an ok envelope with the runner's data" do
       allow(worker_manager).to receive(:run_spec)
-        .with(paths: ["spec/x_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120)
+        .with(paths: ["spec/x_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
+              include_passing: false)
         .and_return(status: "passed")
 
       response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
@@ -29,6 +30,20 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(true)
       expect(payload["error"]["code"]).to eq("invalid_spec_path")
+    end
+
+    it "forwards include_passing to the worker manager and defaults it to false" do
+      allow(worker_manager).to receive(:run_spec).and_return(status: "passed", examples: [])
+
+      described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
+      described_class.call(paths: ["spec/x_spec.rb"], include_passing: true, server_context: server_context)
+
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_passing: false)).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_passing: true)).ordered
+    end
+
+    it "declares include_passing as a boolean input" do
+      expect(described_class.input_schema.to_h.dig(:properties, :include_passing)).to eq(type: "boolean")
     end
   end
 
@@ -73,6 +88,10 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("engine field")
     end
 
+    it "tells the client how to page through the results" do
+      expect(described_class.description).to include("next_offset")
+    end
+
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
         .with(query: "widgets", limit: 50, offset: 0)
@@ -83,6 +102,15 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(false)
       expect(payload["data"]).to eq("items" => [], "matched" => 0, "limit" => 50, "offset" => 0)
+    end
+
+    it "defaults limit to 100" do
+      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
+                                                           next_offset: nil)
+
+      described_class.call(server_context: server_context)
+
+      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0)
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -183,7 +211,8 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.annotations.to_h).to eq(Coatepec::MCP::SpecRunTool.annotations.to_h)
 
       allow(worker_manager).to receive(:run_spec)
-        .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120)
+        .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
+              include_passing: false)
         .and_return(status: "passed")
       response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
 

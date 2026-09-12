@@ -43,6 +43,24 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
     expect(show["path"]).to eq("/widget_admin/audits/:id(.:format)")
   end
 
+  it "reports next_offset while pages remain and nil on the last one" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
+      puts JSON.generate(Coatepec::Introspection::Routes.new(query: "audits", limit: 1).call)
+      puts JSON.generate(Coatepec::Introspection::Routes.new(query: "audits", limit: 1, offset: 1).call)
+    RUBY
+
+    expect(status).to be_success, stderr
+    first, last = stdout.lines.last(2).map { |line| JSON.parse(line) }
+
+    expect(first["items"].size).to eq(1)
+    expect(first["next_offset"]).to eq(1)
+    expect(last["next_offset"]).to be_nil
+  end
+
   it "reports the engine mount as an application route and lists engine routes last" do
     lib_path = File.expand_path("../../../lib", __dir__)
     stdout, stderr, status = run_in_fixture_app(<<~RUBY)

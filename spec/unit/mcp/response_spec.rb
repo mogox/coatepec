@@ -5,7 +5,7 @@ require "coatepec/mcp/response"
 
 RSpec.describe Coatepec::MCP::Response do
   describe ".ok" do
-    it "wraps data and meta in a pretty-printed ok envelope" do
+    it "wraps data and meta in an ok envelope" do
       response = described_class.ok(data: { foo: "bar" }, meta: { environment: "test" })
       payload = JSON.parse(response.content.first[:text])
 
@@ -31,6 +31,23 @@ RSpec.describe Coatepec::MCP::Response do
 
       expect(response.error?).to be(false)
     end
+
+    it "emits compact JSON by default" do
+      response = described_class.ok(data: { foo: "bar" }, meta: {})
+      text = response.content.first[:text]
+
+      expect(text).to eq('{"ok":true,"data":{"foo":"bar"},"meta":{}}')
+    end
+
+    it "pretty-prints when COATEPEC_PRETTY=1 is set" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("COATEPEC_PRETTY").and_return("1")
+
+      text = described_class.ok(data: { foo: "bar" }, meta: {}).content.first[:text]
+
+      expect(text).to include("\n")
+      expect(JSON.parse(text)).to eq("ok" => true, "data" => { "foo" => "bar" }, "meta" => {})
+    end
   end
 
   describe ".error" do
@@ -44,6 +61,13 @@ RSpec.describe Coatepec::MCP::Response do
         "ok" => false,
         "error" => { "code" => "invalid_spec_path", "message" => "bad path", "details" => { "path" => "x" } }
       )
+    end
+
+    it "emits a compact error envelope by default" do
+      err = Coatepec::Error.new(:invalid_spec_path, "bad path", details: {})
+      text = described_class.error(err).content.first[:text]
+
+      expect(text).to eq('{"ok":false,"error":{"code":"invalid_spec_path","message":"bad path","details":{}}}')
     end
   end
 end
