@@ -30,9 +30,10 @@ module Coatepec
       private
 
       # Spelled out so a caller never has to infer a follow-up page from matched > limit.
+      # candidate > @offset guards limit 0, which would otherwise hand back the same offset forever.
       def next_offset_for(matched_count)
         candidate = @offset + @limit
-        candidate < matched_count ? candidate : nil
+        candidate > @offset && candidate < matched_count ? candidate : nil
       end
 
       def filtered_items

@@ -75,6 +75,17 @@ RSpec.describe Coatepec::Introspection::Routes do
     expect(result[:next_offset]).to be_nil
   end
 
+  # A zero limit returns nothing, so a next_offset equal to the current one would page forever.
+  it "reports a nil next_offset when the limit is zero" do
+    routes = (1..3).map { |i| FakeRoute.new("route#{i}", "GET", "/r#{i}", { controller: "c", action: "a" }) }
+    stub_routes(routes)
+
+    result = described_class.new(limit: 0).call
+
+    expect(result[:items]).to eq([])
+    expect(result[:next_offset]).to be_nil
+  end
+
   it "reports routes mounted inside an engine, tagged with the engine name" do
     inner = FakeRoute.new("audits", "GET", "/audits(.:format)",
                           { controller: "widget_admin/audits", action: "index" })

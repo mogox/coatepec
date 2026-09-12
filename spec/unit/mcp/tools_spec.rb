@@ -88,6 +88,10 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("engine field")
     end
 
+    it "tells the client how to page through the results" do
+      expect(described_class.description).to include("next_offset")
+    end
+
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
         .with(query: "widgets", limit: 50, offset: 0)

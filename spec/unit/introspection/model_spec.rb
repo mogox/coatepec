@@ -238,6 +238,18 @@ RSpec.describe Coatepec::Introspection::Model do
                             ])
     end
 
+    # SafeOptions strips Procs and Regexps, so two genuinely different declarations
+    # sanitize to the same triple -- de-duplication has to key on the raw options.
+    it "keeps validators whose options differ only in a Regexp or a Proc" do
+      klass = double(validators: [validator([:email], { with: /@/ }), validator([:email], { with: /\.com\z/ }),
+                                  validator([:name], { presence: true, if: -> { true } }),
+                                  validator([:name], { presence: true, if: -> { false } })])
+
+      entries = model.send(:validators_for, klass)
+
+      expect(entries.size).to eq(4)
+    end
+
     it "de-duplicates before applying the MAX_ITEMS cap" do
       klass = double(validators: Array.new(described_class::MAX_ITEMS + 1) { validator([:slug], {}) } +
                                  [validator([:name], {})])

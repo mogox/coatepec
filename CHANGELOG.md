@@ -8,8 +8,9 @@
 - `rails_spec_run` and `rails_test_run` now omit passing examples from
   `examples` by default -- a 49-test green run drops from ~3,700 tokens to
   ~160 -- and `summary` gains `pending_count`. Pass the new
-  `include_passing: true` input to get the full roster back.
-  `rails_spec_flaky_check` is unaffected: it still sees every example.
+  `include_passing: true` input to get the full roster back (still capped at
+  500 examples). `rails_spec_flaky_check` is unaffected: it still sees every
+  example.
 - `examples[].description` (and `flaky_examples[].description`) is omitted
   when it would only repeat `id`, which is always the case for Minitest.
 - `rails_routes` and `rails_controller` now include the routes of engines

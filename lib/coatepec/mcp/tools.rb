@@ -175,7 +175,9 @@ module Coatepec
       tool_name "rails_routes"
       description "Return a bounded, filterable list of the Rails app's routes, including the routes of mounted " \
                   "engines (one level deep; paths carry the mount point; each item's engine field names the " \
-                  "engine, null for an application route; query also matches the engine field)"
+                  "engine, null for an application route; query also matches the engine field)" \
+                  "; returns up to limit items (default 100) with next_offset -- the offset to pass back " \
+                  "for the next page, null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

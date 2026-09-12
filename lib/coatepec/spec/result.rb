@@ -30,7 +30,7 @@ module Coatepec
 
       # Passing examples are dropped before the cap so a large green run never crowds out its failures.
       def selected_examples(summary, include_passing)
-        examples = summary&.fetch("examples", nil) || []
+        examples = summary&.dig("examples") || []
         examples = examples.reject { |e| e["status"] == "passed" } unless include_passing
         examples.first(MAX_EXAMPLES)
       end
