@@ -152,6 +152,16 @@ a no-op.
   name returns exactly the routes mounted from it. Application routes always
   sort before engine routes, so an unfiltered listing reads the way
   `bin/rails routes` does.
+- An engine route's `name` is relative to its engine, not a top-level url
+  helper: `{"name": "audits", "path": "/widget_admin/audits(.:format)",
+  "engine": "WidgetAdmin::Engine"}` is reached as
+  `widget_admin.audits_path` -- `<mount name>.<name>_path`, where the mount
+  name is the `name` of the mount route itself -- and `audits_path` alone
+  does not exist on the application.
+- An engine mounted at two paths is listed under both mount points, once per
+  prefixed path, since each of those paths is a real, reachable URL.
+  `bin/rails routes` keys engines by endpoint and so lists such an engine
+  only once.
 
 `rails_model`:
 
@@ -171,7 +181,8 @@ a no-op.
   `rails_controller(name: "WidgetsController")` -- see `actions[].routes`,
   each with `verb`, `path` (Rails' raw route spec, `(.:format)` suffix
   included -- byte-identical to the same route's `path` from `rails_routes`),
-  and `route_name`.
+  `route_name`, and `engine` (`null` for an application route, the engine's
+  class name for a route that reaches this controller through a mount).
 - "Does this controller have dead code, or a route that will 500?" -- same
   call -- see `unroutable_actions` (action methods no route reaches --
   probably dead code) and `routes_without_action` (action names the route
@@ -214,11 +225,13 @@ a no-op.
   and set aside" section for why source parsing is out of scope generally).
 
 Routes drawn by an engine mounted in the application are cross-referenced
-like any other, with the mount point on the path -- so a controller that
-lives inside an engine reports its real routes rather than listing every
-action as unroutable. Expansion goes one level deep: an engine mounted
-inside another engine stays an opaque mount route, the same boundary
-`bin/rails routes` (and therefore `rails_routes`) draws.
+like any other, with the mount point on the path and the engine's class name
+in `engine` -- so a controller that lives inside an engine reports its real
+routes rather than listing every action as unroutable. Their `route_name` is
+engine-local, reached as `<mount name>.<route_name>_path`, exactly as in
+`rails_routes`. Expansion goes one level deep: an engine mounted inside
+another engine stays an opaque mount route, the same boundary `bin/rails
+routes` (and therefore `rails_routes`) draws.
 
 `rails_spec_flaky_check`:
 

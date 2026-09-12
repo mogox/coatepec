@@ -66,6 +66,14 @@ RSpec.describe "Coatepec MCP tools" do
   end
 
   describe Coatepec::MCP::RoutesTool do
+    # The description is the whole agent-facing contract for this tool -- the
+    # README is invisible to an MCP client -- so engine expansion has to be
+    # stated there or no caller learns the `engine` field exists.
+    it "announces engine expansion and the engine field in its description" do
+      expect(described_class.description).to include("engines")
+      expect(described_class.description).to include("engine field")
+    end
+
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
         .with(query: "widgets", limit: 50, offset: 0)

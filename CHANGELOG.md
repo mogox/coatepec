@@ -9,13 +9,19 @@
   `/widget_admin/audits(.:format)` is what both tools report, and a
   controller living inside an engine no longer has all of its actions listed
   under `unroutable_actions`.
-- `rails_routes` items gain an `engine` field: `null` for an application
-  route, the engine's class name otherwise. `query` matches against it like
-  every other column, so `query: "Avo::Engine"` returns exactly that engine's
-  routes. Application routes are listed before engine routes.
-- `rails_routes` now omits routes Rails marks `internal` -- its own
-  `/rails/info` and friends -- matching `bin/rails routes`. This is a
-  behaviour change for callers that relied on seeing them.
+- `rails_routes` items and `rails_controller`'s `actions[].routes` entries
+  gain an `engine` field: `null` for an application route, the engine's class
+  name otherwise. `rails_routes`' `query` matches against it like every other
+  column, so `query: "Avo::Engine"` returns exactly that engine's routes.
+  Application routes are listed before engine routes.
+- An engine route's `name` (`route_name` in `rails_controller`) is relative
+  to its engine: it is reached through the mount's helper,
+  `<mount name>.<name>_path`, where the mount name is the `name` of the mount
+  route itself -- never as a top-level url helper.
+- `rails_routes` and `rails_controller` now omit routes Rails marks
+  `internal` -- its own `/rails/info` and friends -- matching
+  `bin/rails routes`. This is a behaviour change for callers that relied on
+  seeing them.
 - Add Minitest support to `rails_spec_run` and `rails_spec_flaky_check`:
   selectors under a `test/` root ending in `_test.rb` run through Rails'
   Minitest runner in the same warm worker, with the same
