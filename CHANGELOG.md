@@ -2,6 +2,20 @@
 
 ## 0.8.0
 
+- `rails_routes` and `rails_controller` now include the routes of engines
+  mounted in the application, expanded one level deep (an engine mounted
+  inside another engine stays an opaque mount route, the same boundary
+  `bin/rails routes` draws). Paths carry the mount point, so
+  `/widget_admin/audits(.:format)` is what both tools report, and a
+  controller living inside an engine no longer has all of its actions listed
+  under `unroutable_actions`.
+- `rails_routes` items gain an `engine` field: `null` for an application
+  route, the engine's class name otherwise. `query` matches against it like
+  every other column, so `query: "Avo::Engine"` returns exactly that engine's
+  routes. Application routes are listed before engine routes.
+- `rails_routes` now omits routes Rails marks `internal` -- its own
+  `/rails/info` and friends -- matching `bin/rails routes`. This is a
+  behaviour change for callers that relied on seeing them.
 - Add Minitest support to `rails_spec_run` and `rails_spec_flaky_check`:
   selectors under a `test/` root ending in `_test.rb` run through Rails'
   Minitest runner in the same warm worker, with the same
