@@ -66,9 +66,8 @@ RSpec.describe "Coatepec MCP tools" do
   end
 
   describe Coatepec::MCP::RoutesTool do
-    # The description is the whole agent-facing contract for this tool -- the
-    # README is invisible to an MCP client -- so engine expansion has to be
-    # stated there or no caller learns the `engine` field exists.
+    # The description is the whole agent-facing contract (the README is invisible to an MCP
+    # client), so engine expansion and the `engine` field have to be stated there.
     it "announces engine expansion and the engine field in its description" do
       expect(described_class.description).to include("engines")
       expect(described_class.description).to include("engine field")

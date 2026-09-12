@@ -3,10 +3,8 @@
 require "spec_helper"
 require "coatepec/introspection/route_entries"
 
-# Mirrors the Struct fakes in routes_spec.rb: a route object that responds to
-# nothing beyond `path`, as the plainest Journey route effectively does for
-# RouteEntries' purposes. Proves the respond_to? guards hold for objects that
-# know nothing about `internal` or `app`.
+# A route that responds to nothing beyond `path`, proving the respond_to? guards
+# hold for objects that know nothing about `internal` or `app`.
 BareFakeRoute = Struct.new(:path_spec) do
   def path
     Struct.new(:spec).new(path_spec)
@@ -14,9 +12,10 @@ BareFakeRoute = Struct.new(:path_spec) do
 end
 
 RSpec.describe Coatepec::Introspection::RouteEntries do
-  # RouteEntries reads exactly two things off a route -- `path.spec` and,
-  # where present, `internal` / `app` -- so the doubles stub only those. Any
-  # other message would raise, which is the point: nothing else is touched.
+  # Only a ::Rails::Engine subclass is expanded, so the fakes need a stand-in base class.
+  before { stub_const("Rails::Engine", Class.new) }
+
+  # Doubles stub only what RouteEntries reads; any other message raises, which is the point.
   def route(path, **extras)
     double(path: double(spec: path), **extras)
   end
@@ -25,11 +24,10 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     route(path, app: double(engine?: engine, rack_app: rack_app))
   end
 
-  # The mounted app Rails hands back IS the engine class itself, so `.name`
-  # is the engine name and `.routes` is its RouteSet.
+  # Rails hands back the engine class itself: `.name` is the engine name, `.routes` its RouteSet.
   def engine_class(name, inner_routes)
     route_set = double(routes: inner_routes)
-    Class.new do
+    Class.new(Rails::Engine) do
       define_singleton_method(:name) { name }
       define_singleton_method(:routes) { route_set }
     end
@@ -83,11 +81,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
   end
 
   it "names an anonymous engine class with a fixed, deterministic fallback" do
-    # Class.new(::Rails::Engine) mounted directly has no constant, so .name is
-    # nil. A nil here would make the engine's routes indistinguishable from
-    # application ones, breaking the "non-nil engine means engine route"
-    # invariant every consumer reads. The label is fixed rather than derived
-    # from the object, so it does not change from one boot to the next.
+    # Class.new(Rails::Engine) has a nil name; a fixed label keeps its routes tagged as engine routes.
     engine = engine_class(nil, [route("/audits(.:format)")])
 
     entries = described_class.call([mount("/anon(.:format)", rack_app: engine)])
@@ -126,14 +120,32 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     expect(entries.map(&:engine)).to eq([nil])
   end
 
+  it "never names or expands a class that answers engine? but is not a Rails::Engine" do
+    impostor = Class.new
+    expect(impostor).not_to receive(:name)
+    expect(impostor).not_to receive(:routes)
+
+    entries = described_class.call([mount("/impostor(.:format)", rack_app: impostor)])
+
+    expect(entries.map(&:path)).to eq(["/impostor(.:format)"])
+    expect(entries.map(&:engine)).to eq([nil])
+  end
+
+  it "never calls name on a non-class rack app that answers engine?" do
+    impostor = double("rack app")
+
+    entries = described_class.call([mount("/impostor(.:format)", rack_app: impostor)])
+
+    expect(entries.map(&:engine)).to eq([nil])
+  end
+
   it "skips an engine whose route set does not expose routes" do
-    engine = Class.new do
+    engine = Class.new(Rails::Engine) do
       define_singleton_method(:name) { "Broken::Engine" }
       define_singleton_method(:routes) { Object.new }
     end
 
-    # A raise here would fail the example on its own; the mount survives as a
-    # plain application entry with nothing flattened underneath it.
+    # The mount survives as a plain application entry with nothing flattened underneath it.
     entries = described_class.call([mount("/broken(.:format)", rack_app: engine)])
 
     expect(entries.map(&:path)).to eq(["/broken(.:format)"])

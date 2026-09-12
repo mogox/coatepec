@@ -8,13 +8,8 @@ module Coatepec
     # for the rails_controller MCP tool. Pure reflection over an already-loaded,
     # already-gated class -- no request dispatch, no action execution, and no
     # evaluation of app-authored callback conditions.
-    # rubocop:disable Metrics/ClassLength -- route cross-referencing adds
-    # genuinely cohesive functionality: routes_by_action, grouped_routes,
-    # controller_entries, route_data, and rails_routes exist solely to serve
-    # this class's single responsibility (reflect on one controller).
-    # Splitting them into a separate collaborator class would fragment that
-    # one responsibility across files for no readability gain, only to satisfy
-    # a line count.
+    # rubocop:disable Metrics/ClassLength -- the route cross-referencing methods serve this class's
+    # one responsibility (reflect on one controller); splitting them out would only satisfy a line count.
     class Controller
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
@@ -104,16 +99,8 @@ module Coatepec
         end
       end
 
-      # controller_path is the public, correctly-namespaced key Rails itself
-      # stores in a route's defaults (Admin::ReportsController =>
-      # "admin/reports"), so matching on it needs no name munging.
-      #
-      # Routes are read through RouteEntries, so a controller reached only
-      # through a mounted engine is cross-referenced too: engines are expanded
-      # one level and their paths carry the mount prefix, exactly as
-      # Introspection::Routes reports them to rails_routes.
-      # A route whose defaults[:action] is nil or empty (a mount or redirect)
-      # is skipped, not recorded under an empty-string action.
+      # Matches on controller_path, Rails' own key in route defaults ("admin/reports"), through
+      # RouteEntries so engine controllers resolve too. Routes with no action (mounts, redirects) are skipped.
       def routes_by_action(klass)
         grouped_routes(klass).transform_values { |list| list.first(MAX_ITEMS).map { |entry| route_data(entry) } }
       end
@@ -141,18 +128,8 @@ module Coatepec
         (routes.keys - defined_actions).sort.first(MAX_ITEMS)
       end
 
-      # path is the entry's path, not the route's own spec: it keeps Rails' raw
-      # `(.:format)` suffix and, for an engine route, carries the mount prefix
-      # RouteEntries put there -- the very same string rails_routes reports for
-      # that route, so a path here is byte-identical to it. Recomputing either
-      # half would make the two tools disagree about the same route.
-      #
-      # `engine` carries the same marker for the same reason: nil for an
-      # application route, the engine's class name otherwise. Without it a
-      # caller cannot tell which of these routes are engine-local, and
-      # route_name is exactly where that matters -- an engine route's name is
-      # relative to its engine, reachable only through the mount's helper
-      # (`<mount name>.<route_name>_path`), never as a top-level one.
+      # path and engine come off the entry, so they are byte-identical to rails_routes' values for the
+      # same route. An engine route's name is engine-local: reach it as `<mount name>.<route_name>_path`.
       def route_data(entry)
         { verb: entry.route.verb.to_s, path: entry.path, route_name: entry.route.name&.to_s, engine: entry.engine }
       end

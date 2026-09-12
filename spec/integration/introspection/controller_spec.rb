@@ -89,8 +89,7 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     index = result["actions"].find { |a| a["name"] == "index" }
     expect(index["routes"].map { |r| r["verb"] }).to eq(["GET"])
     expect(index["routes"].first["path"]).to eq("/widgets(.:format)")
-    # An application route carries a null engine, the same marker rails_routes
-    # reports for it.
+    # An application route carries a null engine, the same marker rails_routes reports.
     expect(index["routes"].first["engine"]).to be_nil
 
     update = result["actions"].find { |a| a["name"] == "update" }
@@ -118,9 +117,8 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     expect(result["controller_path"]).to eq("widget_admin/audits")
 
     index = result["actions"].find { |a| a["name"] == "index" }
-    # The mount point is on the path, so this is byte-identical to the same
-    # route's path from rails_routes, and `engine` names the engine it came
-    # from rather than leaving it to be mistaken for an application route.
+    # Mount point on the path (byte-identical to rails_routes) and `engine` set, so the route
+    # cannot be mistaken for an application one.
     expect(index["routes"])
       .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits(.:format)", "route_name" => "audits",
                 "engine" => "WidgetAdmin::Engine" }])
@@ -128,8 +126,7 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     show = result["actions"].find { |a| a["name"] == "show" }
     expect(show["routes"].first["path"]).to eq("/widget_admin/audits/:id(.:format)")
 
-    # The engine routes index/show only, so `export` is genuinely unroutable
-    # -- it must not be swept up by the engine's routes now being visible.
+    # The engine routes index/show only, so `export` stays genuinely unroutable.
     expect(result["unroutable_actions"]).to eq(["export"])
     expect(result["routes_without_action"]).to eq([])
   end

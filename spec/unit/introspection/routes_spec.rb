@@ -14,11 +14,13 @@ RSpec.describe Coatepec::Introspection::Routes do
     allow(described_class).to receive(:rails_routes).and_return(routes)
   end
 
-  # Stands in for a mounted engine: Rails hands back the engine class itself,
-  # whose .routes is a RouteSet wrapping the engine's own routes.
+  # Only a ::Rails::Engine subclass is expanded, so the fake needs a stand-in base class.
+  before { stub_const("Rails::Engine", Class.new) }
+
+  # Rails hands back the engine class itself, whose .routes is a RouteSet wrapping its own routes.
   def engine_class(name, inner_routes)
     route_set = double(routes: inner_routes)
-    Class.new do
+    Class.new(Rails::Engine) do
       define_singleton_method(:name) { name }
       define_singleton_method(:routes) { route_set }
     end

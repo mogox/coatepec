@@ -137,10 +137,8 @@ module ControllerFixtures
   FakePath = Struct.new(:spec)
   FakeRoute = Struct.new(:verb, :path, :name, :defaults)
 
-  # A mount route adds exactly one member to that surface: `app`, off which
-  # RouteEntries reads `engine?` and `rack_app`. Keeping it a separate struct
-  # leaves FakeRoute free of an `app` member, so the plain-route examples keep
-  # proving RouteEntries' respond_to? guard for routes that have none.
+  # A mount route adds one member, `app`. Kept as a separate struct so FakeRoute stays without
+  # `app` and the plain-route examples keep proving RouteEntries' respond_to? guard.
   FakeMountedApp = Struct.new(:rack_app) do
     def engine?
       true
@@ -148,9 +146,7 @@ module ControllerFixtures
   end
   FakeMountRoute = Struct.new(:verb, :path, :name, :defaults, :app)
 
-  # The controller an engine's own route set reaches. `export` is deliberately
-  # unrouted, so it must still be reported as unroutable even once the engine's
-  # routes are cross-referenced.
+  # Reached only through an engine's routes; `export` is deliberately unrouted.
   class EngineAuditsController < ActionController::Base
     def index; end
     def show; end
@@ -412,12 +408,12 @@ RSpec.describe Coatepec::Introspection::Controller do
       expect(all_paths).not_to include("/other(.:format)", "/up(.:format)")
     end
 
-    # The mounted app Rails hands back IS the engine class itself, so `.name`
-    # is the engine name and `.routes` is its RouteSet, whose own `.routes` is
-    # the enumerable of routes drawn inside the engine.
+    # Rails hands back the engine class itself, whose .routes is a RouteSet wrapping its own routes.
+    # Only a ::Rails::Engine subclass is expanded, hence the stand-in base class.
     def fake_engine(name, inner_routes)
+      stub_const("Rails::Engine", Class.new)
       route_set = Struct.new(:routes).new(inner_routes)
-      Class.new do
+      Class.new(Rails::Engine) do
         define_singleton_method(:name) { name }
         define_singleton_method(:routes) { route_set }
       end
@@ -442,8 +438,7 @@ RSpec.describe Coatepec::Introspection::Controller do
       engine_result = described_class.new("ControllerFixtures::EngineAuditsController").call
 
       index = engine_result[:actions].find { |a| a[:name] == "index" }
-      # The mount prefix is on the path and `engine` names the engine, exactly
-      # as rails_routes reports the same route.
+      # Mount prefix on the path and `engine` set, exactly as rails_routes reports the same route.
       expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits(.:format)", route_name: "audits",
                                       engine: "WidgetAdmin::Engine" }])
       expect(engine_result[:actions].find { |a| a[:name] == "show" }[:routes].first[:path])

@@ -2,23 +2,8 @@
 
 module Coatepec
   module Introspection
-    # Flattens a Rails route set into a single list of entries: every
-    # application route, followed by the routes of every engine mounted by
-    # those routes, each with the mount path prefixed onto it.
-    #
-    # This deliberately mirrors ActionDispatch::Routing::RoutesInspector's
-    # #load_engines_routes, which is what `bin/rails routes` shows: engines are
-    # expanded one level only (an engine mounted inside an engine stays an
-    # opaque mount route), and routes flagged `internal` -- Rails' own
-    # /rails/info and friends -- are dropped at both levels. It diverges on one
-    # point: Rails keys engines by endpoint, so an engine mounted at two paths
-    # is listed once, whereas this emits that engine's routes under both mount
-    # prefixes, because each prefixed path is a real, reachable URL.
-    #
-    # Every attribute beyond `path` is reached through a respond_to? guard.
-    # Unit specs feed this class plain Structs and doubles standing in for
-    # Journey routes, and no ActionDispatch constant is named here, so the
-    # file loads and runs with no Rails booted at all.
+    # Flattens a route set into application routes followed by one level of mounted-engine
+    # routes with the mount path prefixed, the way `bin/rails routes` shows them.
     class RouteEntries
       Entry = Struct.new(:route, :path, :engine)
 
@@ -39,65 +24,48 @@ module Coatepec
 
       private
 
+      # Rails' own /rails/info routes; `bin/rails routes` hides them too. Guarded so unit-spec structs work.
       def internal?(route)
         route.respond_to?(:internal) && route.internal
       end
 
+      # One level only, like RoutesInspector; an engine mounted at two paths appears under both.
       def engine_entries(route)
         return [] unless engine_mount?(route)
 
-        rack_app = route.app.rack_app
+        engine = route.app.rack_app
         prefix = mount_prefix(route)
-        name = engine_name(rack_app)
-        inner_routes(rack_app).reject { |inner| internal?(inner) }.map do |inner|
-          # chomp collapses the double slash an engine mounted at "/" makes,
-          # and only that one: every inner spec already starts with "/", so
-          # the junction is the sole place a "//" can appear. Squeezing the
-          # joined string instead would also rewrite a "//" the route spec
-          # legitimately carries elsewhere.
-          Entry.new(inner, prefix.chomp("/") + inner.path.spec.to_s, name)
-        end
+        name = engine_name(engine)
+        inner_routes(engine).reject { |inner| internal?(inner) }
+                            .map { |inner| Entry.new(inner, prefix + inner.path.spec.to_s, name) }
       end
 
-      # Defensive strip: ActionDispatch::Routing::Mapper#mount defaults to
-      # `format: false`, so a real mount spec does not carry the `(.:format)`
-      # suffix -- but a mount declared with `format: true` would, and the inner
-      # routes supply their own suffix, so it must not survive into the prefix.
+      # A `format: true` mount would carry (.:format); the inner routes bring their own. chomp only
+      # affects a mount at "/", whose junction is the one place a "//" could form.
       def mount_prefix(route)
-        route.path.spec.to_s.sub(/\(\.:format\)\z/, "")
+        route.path.spec.to_s.sub(/\(\.:format\)\z/, "").chomp("/")
       end
 
+      # Only a ::Rails::Engine subclass is expanded or named; nothing else ever gets .name called on it.
       def engine_mount?(route)
-        route.respond_to?(:app) && route.app.respond_to?(:engine?) && route.app.engine?
+        route.respond_to?(:app) && route.app.respond_to?(:engine?) && route.app.engine? &&
+          rails_engine?(route.app.rack_app)
       end
 
-      # rack_app IS the engine class (not an instance of it), so its own .name
-      # is the engine name -- .class.name here would yield "Class".
-      #
-      # An anonymous engine (Class.new(::Rails::Engine) mounted directly) has a
-      # nil name, which would make its routes indistinguishable from
-      # application ones and break the "non-nil engine means engine route"
-      # invariant, so it falls back to a fixed label. Not #inspect: that
-      # yields an object address that changes every boot -- and, on an
-      # arbitrary object, dumps its ivars -- so nothing here ever serialises
-      # an app object's #inspect or #to_s (Controller#filter_description
-      # substitutes "(block)" for a Proc for the same reason).
-      def engine_name(rack_app)
-        name = rack_app.is_a?(Class) ? rack_app.name : rack_app.class.name
-        name || "(anonymous engine)"
+      def rails_engine?(rack_app)
+        defined?(::Rails::Engine) && rack_app.is_a?(Class) && rack_app < ::Rails::Engine
       end
 
-      # An engine's .routes is an ActionDispatch::Routing::RouteSet, whose own
-      # .routes is the enumerable of Journey routes. Anything else mounted
-      # under an engine-shaped app is left unflattened rather than raising.
-      #
-      # The first guard is belt-and-braces for the unit specs' fakes: a real
-      # Rails mount that answers `engine?` is a ::Rails::Engine subclass, which
-      # always responds to `routes`, so only a hand-built double can reach it.
-      def inner_routes(rack_app)
-        return [] unless rack_app.respond_to?(:routes)
+      # Class.new(Rails::Engine) has a nil name; a fixed label keeps its routes tagged and boot-stable.
+      def engine_name(engine)
+        engine.name || "(anonymous engine)"
+      end
 
-        route_set = rack_app.routes
+      # engine.routes is a RouteSet whose .routes holds the Journey routes; anything else stays unflattened.
+      def inner_routes(engine)
+        return [] unless engine.respond_to?(:routes)
+
+        route_set = engine.routes
         route_set.respond_to?(:routes) ? route_set.routes : []
       end
     end

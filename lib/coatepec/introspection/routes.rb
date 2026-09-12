@@ -4,11 +4,8 @@ require_relative "route_entries"
 
 module Coatepec
   module Introspection
-    # Returns a bounded, filterable list of the target Rails app's routes,
-    # for the rails_routes MCP tool. Reads Rails.application.routes.routes and
-    # -- via RouteEntries -- the routes of every engine those routes mount,
-    # skipping Rails' own internal routes, exactly as `bin/rails routes` does.
-    # No console, no request dispatch.
+    # Returns a bounded, filterable list of the target app's routes, mounted-engine routes
+    # included, for the rails_routes MCP tool. Reads route tables only -- no console, no dispatch.
     class Routes
       MAX_LIMIT = 200
       DEFAULT_LIMIT = 50
@@ -43,8 +40,7 @@ module Coatepec
         RouteEntries.call(self.class.rails_routes).map { |entry| item_for(entry) }
       end
 
-      # The path comes off the entry rather than the route: for an engine
-      # route it is the inner path with the mount point prefixed onto it.
+      # path comes off the entry: for an engine route it already carries the mount prefix.
       def item_for(entry)
         route = entry.route
         defaults = route.defaults
