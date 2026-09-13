@@ -44,16 +44,9 @@ module Coatepec
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
             include_passing: include_passing, include_stdout: include_stdout
           )
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -75,7 +68,7 @@ module Coatepec
     end
 
     # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
-    # versions, PID, boot_id, and lifecycle state. Worker::Server#handle boots
+    # versions, PID, boot_id, lifecycle state and the project root. Worker::Server#handle boots
     # the Rails runtime before dispatching any command, so the first call to
     # this tool starts (and blocks on) a full Rails boot just like a spec run.
     class RuntimeStatusTool < ::MCP::Tool
@@ -88,11 +81,8 @@ module Coatepec
       class << self
         def call(server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].status
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          Response.ok(data: data,
-                      meta: { project_root: server_context[:project_root], environment: "test",
-                              duration_ms: duration_ms })
+          data = server_context[:worker_manager].status.merge(project_root: server_context[:project_root])
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
         end
@@ -114,10 +104,7 @@ module Coatepec
         def call(server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].restart!
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          Response.ok(data: data,
-                      meta: { project_root: server_context[:project_root], environment: "test",
-                              duration_ms: duration_ms })
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
         end
@@ -154,16 +141,9 @@ module Coatepec
           data = server_context[:worker_manager].check_flaky(
             paths: paths, example: example, timeout_seconds: timeout_seconds, runs: runs
           )
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -207,16 +187,9 @@ module Coatepec
         def call(server_context:, query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -243,16 +216,9 @@ module Coatepec
         def call(name:, server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].model(name: name)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -276,16 +242,9 @@ module Coatepec
         def call(name:, server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].controller(name: name)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end

@@ -88,6 +88,9 @@
   `<option>_truncated: true` beside it -- a 249-code `inclusion` list no
   longer costs 1.4 KB per model. Shorter lists are unchanged and carry no
   sibling keys.
+- Every tool response's `meta` is now just `duration_ms`; `project_root` is
+  reported once by `rails_runtime_status` (beside `environment`) instead of
+  on every call.
 
 ## 0.7.0
 

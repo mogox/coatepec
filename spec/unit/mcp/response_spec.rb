@@ -50,6 +50,17 @@ RSpec.describe Coatepec::MCP::Response do
     end
   end
 
+  describe ".meta" do
+    it "reports only the elapsed milliseconds since started_at" do
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) - 0.25
+
+      meta = described_class.meta(started_at)
+
+      expect(meta.keys).to eq([:duration_ms])
+      expect(meta[:duration_ms]).to be_between(250, 2_000)
+    end
+  end
+
   describe ".error" do
     it "wraps a Coatepec::Error in an error envelope and marks isError" do
       err = Coatepec::Error.new(:invalid_spec_path, "bad path", details: { path: "x" })

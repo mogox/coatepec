@@ -19,7 +19,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(false)
       expect(payload["data"]).to eq("status" => "passed")
-      expect(payload["meta"]["project_root"]).to eq("/app")
+      expect(payload["meta"].keys).to eq(["duration_ms"])
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -80,7 +80,7 @@ RSpec.describe "Coatepec MCP tools" do
       response = described_class.call(server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
-      expect(payload["data"]).to eq("environment" => "test")
+      expect(payload["data"]).to eq("environment" => "test", "project_root" => "/app")
     end
   end
 
