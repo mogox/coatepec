@@ -61,6 +61,16 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("include_stdout")
       expect(Coatepec::MCP::TestRunTool.description).to include("include_stdout")
     end
+
+    # Three benchmark sessions read failure_count against Minitest's own "0 failures, 5 errors" line and
+    # suspected a bug; the description is the only place an MCP client can learn the vocabulary.
+    it "explains that results use RSpec vocabulary on both tools" do
+      [described_class, Coatepec::MCP::TestRunTool].each do |tool|
+        expect(tool.description).to include("RSpec vocabulary")
+        expect(tool.description).to include("failure_count")
+        expect(tool.description).to include("pending")
+      end
+    end
   end
 
   describe Coatepec::MCP::RuntimeStatusTool do
@@ -159,6 +169,11 @@ RSpec.describe "Coatepec MCP tools" do
   end
 
   describe Coatepec::MCP::ModelTool do
+    it "explains validator de-duplication and option truncation in its description" do
+      expect(described_class.description).to include("distinct validators")
+      expect(described_class.description).to include("_truncated")
+    end
+
     it "returns an ok envelope with the model data" do
       allow(worker_manager).to receive(:model).with(name: "Widget").and_return(name: "Widget", columns: [])
 

@@ -23,6 +23,9 @@ module Coatepec
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
+                  "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
+                  "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
+                  "stdout) and a skip is pending" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -59,6 +62,9 @@ module Coatepec
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
                   "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
+                  "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
+                  "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
+                  "stdout) and a skip is pending" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -216,7 +222,10 @@ module Coatepec
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
       description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data"
+                  "without row data; validators are de-duplicated by class, attributes and options, so the list " \
+                  "holds distinct validators and can be shorter than klass.validators; an array-valued validator " \
+                  "option longer than 20 entries keeps its first 20 with <option>_count and <option>_truncated " \
+                  "beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

@@ -135,7 +135,7 @@ a no-op.
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`include`/`exclude`/`only`, default `include`) | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). `engines: "exclude"` returns application routes only (the engine's mount route counts as one), `"only"` the engine routes; the filter applies before `query`, so `matched`/`next_offset` describe the filtered set. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
-| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
 | `rails_test_flaky_check` | same as `rails_spec_flaky_check` | Alias of `rails_spec_flaky_check` |
@@ -299,7 +299,9 @@ suspect.
   (`example: "reaches the"` matches `test_reaches_the_database`), passed to
   Minitest as an escaped regex.
 - Results use RSpec's vocabulary so the shape is identical: a Minitest skip
-  is `"pending"`, an error is `"failed"`; `id` is `ClassName#test_method`.
+  is `"pending"`, an error is `"failed"` and counts toward
+  `summary.failure_count` -- which is why that number can exceed the
+  `failures` Minitest prints in `stdout`; `id` is `ClassName#test_method`.
 - One call may not mix `spec/` and `test/` paths (`mixed_test_frameworks`).
 - Rails' parallel testing is disabled in the child (`PARALLEL_WORKERS=1`), so
   a large directory selection runs serially under the one timeout budget
