@@ -41,8 +41,8 @@ module Coatepec
       )
     end
 
-    def routes(query: nil, limit: 100, offset: 0)
-      dispatch("routes", { query: query, limit: limit, offset: offset }, timeout: 30)
+    def routes(query: nil, limit: 100, offset: 0, engines: "include")
+      dispatch("routes", { query: query, limit: limit, offset: offset, engines: engines }, timeout: 30)
     end
 
     def model(name:)

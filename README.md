@@ -134,7 +134,7 @@ a no-op.
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`include`/`exclude`/`only`, default `include`) | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). `engines: "exclude"` returns application routes only (the engine's mount route counts as one), `"only"` the engine routes; the filter applies before `query`, so `matched`/`next_offset` describe the filtered set. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
@@ -150,6 +150,11 @@ a no-op.
   action -- not just the path -- so a resource name alone typically returns
   every route for that resource (index/create/new/...); narrow further with
   something like `query: "new_widget"` to hit one route by name.
+- "What's the URL for widgets, ignoring the admin engine?" --
+  `rails_routes(query: "widget", engines: "exclude")`. In an app with a
+  mounted admin engine the engine's CRUD scaffolding is often two thirds of
+  every match; `engines: "exclude"` leaves the application's own routes (the
+  mount route itself included), `engines: "only"` the engine's.
 - "Which routes accept POST?" -- `rails_routes(query: "POST")`, the same
   substring match applied to the verb column.
 - "Which routes does the Avo engine add?" -- `rails_routes(query: "Avo::Engine")`

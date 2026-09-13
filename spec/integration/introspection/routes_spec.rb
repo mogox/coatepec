@@ -82,4 +82,24 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
     expect(items.find { |r| r["controller"] == "widgets" && r["action"] == "index" }["engine"]).to be_nil
     expect(items.find { |r| r["name"] == "widget_admin" }).to include("engine" => nil)
   end
+
+  it "drops engine routes under engines: exclude and keeps only them under engines: only" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
+      puts JSON.generate(Coatepec::Introspection::Routes.new(engines: "exclude", limit: 200).call)
+      puts JSON.generate(Coatepec::Introspection::Routes.new(engines: "only", limit: 200).call)
+    RUBY
+
+    expect(status).to be_success, stderr
+    excluded, only = stdout.lines.last(2).map { |line| JSON.parse(line) }
+
+    expect(excluded["items"].map { |r| r["engine"] }).to all(be_nil)
+    expect(excluded["items"].map { |r| r["name"] }).to include("widgets", "widget_admin")
+    expect(only["items"].map { |r| r["engine"] }).to all(eq("WidgetAdmin::Engine"))
+    expect(only["items"]).not_to be_empty
+    expect(excluded["matched"] + only["matched"]).to eq(excluded["items"].size + only["items"].size)
+  end
 end

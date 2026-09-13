@@ -71,6 +71,11 @@
   `include_stdout: false` returns `stdout: null` -- the key stays so the result
   shape is uniform -- for callers that only read `summary` and `examples`.
   `stderr` is always returned.
+- `rails_routes` gains `engines` (`include`, the default; `exclude`; `only`).
+  `exclude` returns application routes only -- an engine's mount route counts
+  as one -- and `only` the mounted engines' routes. The filter applies before
+  `query`, so `matched` and `next_offset` describe the filtered set. On an app
+  with a mounted admin engine a typical resource query shrinks by about 60%.
 
 ## 0.7.0
 

@@ -125,4 +125,56 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     expect(result[:limit]).to eq(200)
   end
+
+  def app_and_engine_routes
+    inner = FakeRoute.new("audits", "GET", "/audits(.:format)", { controller: "widget_admin/audits", action: "index" })
+    engine = engine_class("WidgetAdmin::Engine", [inner])
+    stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" }),
+                 double(name: "widget_admin", verb: "", path: double(spec: "/widget_admin"), defaults: {},
+                        app: double(engine?: true, rack_app: engine))])
+  end
+
+  it "includes engine routes by default" do
+    app_and_engine_routes
+
+    result = described_class.new.call
+
+    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin audits])
+  end
+
+  it "returns application routes only, mount route included, when engines is exclude" do
+    app_and_engine_routes
+
+    result = described_class.new(engines: "exclude").call
+
+    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin])
+    expect(result[:matched]).to eq(2)
+  end
+
+  it "returns engine routes only when engines is only" do
+    app_and_engine_routes
+
+    result = described_class.new(engines: "only").call
+
+    expect(result[:items].map { |r| r[:name] }).to eq(%w[audits])
+    expect(result[:matched]).to eq(1)
+  end
+
+  # Filtering before the query keeps matched/next_offset consistent with the items actually returned.
+  it "applies the engine filter before the query match and the page" do
+    app_and_engine_routes
+
+    result = described_class.new(query: "widget", engines: "exclude", limit: 1).call
+
+    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets])
+    expect(result[:matched]).to eq(2)
+    expect(result[:next_offset]).to eq(1)
+  end
+
+  it "rejects an unknown engines value" do
+    stub_routes([])
+
+    expect { described_class.new(engines: "some") }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_engines_filter) }
+  end
 end
