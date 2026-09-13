@@ -105,6 +105,15 @@ RSpec.describe Coatepec::Spec::FailureCollapser do
     expect(result).not_to include("events_controller_test.rb:29")
   end
 
+  it "ends a Minitest block on a bare \"rails test path:LINE\" rerun line too" do
+    result = described_class.call(minitest_text.gsub("bin/rails test ", "rails test "))
+    rollup = "1 more test failed with this same error: EventsControllerTest#test_should_show_event_talks\n"
+
+    expect(result.scan("Vite Ruby can't find").size).to eq(1)
+    expect(result).to include("rails test test/controllers/events_controller_test.rb:24\n#{rollup}")
+    expect(result).not_to include("events_controller_test.rb:29")
+  end
+
   it "leaves a Minitest block with a different error, the progress marks and the summary untouched" do
     result = described_class.call(minitest_text)
     header = "Failure:\nEventsControllerTest#test_should_get_index " \

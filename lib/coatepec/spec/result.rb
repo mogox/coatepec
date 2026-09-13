@@ -7,8 +7,8 @@ module Coatepec
     # Turns a finished test child's exit status, captured output (each capped
     # at MAX_OUTPUT_BYTES) and the framework's JSON summary into the flat
     # result hash rails_spec_run returns. Passing examples are omitted unless
-    # include_passing; repeated failure blocks in stdout are collapsed by
-    # FailureCollapser, and stdout is nulled when include_stdout is false.
+    # include_passing; stdout is nulled when include_stdout is false, and
+    # otherwise its repeated failure blocks are collapsed by FailureCollapser.
     module Result
       MAX_OUTPUT_BYTES = 256 * 1024
       MAX_EXAMPLES = 500
@@ -16,8 +16,8 @@ module Coatepec
       module_function
 
       def build(pid:, status:, out_r:, err_r:, json_path:, include_passing: false, include_stdout: true)
-        stdout_result = collapse_failures(read_bounded(out_r))
-        stdout_result = stdout_result.merge(text: nil) unless include_stdout
+        captured = read_bounded(out_r)
+        stdout_result = include_stdout ? collapse_failures(captured) : captured.merge(text: nil)
         stderr_result = read_bounded(err_r)
         summary = read_summary(json_path)
 

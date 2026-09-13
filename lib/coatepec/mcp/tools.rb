@@ -24,7 +24,8 @@ module Coatepec
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
                   "; returns only failed and pending examples unless include_passing is true" \
-                  "; pass include_stdout: false to drop the captured stdout when summary and examples are enough"
+                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
+                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
@@ -59,7 +60,8 @@ module Coatepec
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
                   "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
                   "; returns only failed and pending examples unless include_passing is true" \
-                  "; pass include_stdout: false to drop the captured stdout when summary and examples are enough"
+                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
+                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
     end

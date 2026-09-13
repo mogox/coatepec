@@ -7,7 +7,7 @@ module Coatepec
     module FailureCollapser
       MINITEST_START = /\A(?:Error|Failure):\z/
       MINITEST_ID = /\A(\S+#\S+?)(?: \[[^\]]*\])?:\z/
-      MINITEST_END = /\A\S.*\brails test \S+:\d+\z/
+      MINITEST_END = /\A\S*\brails test \S+:\d+\z/
       RSPEC_START = /\A  \d+\) (.+)\z/
       RSPEC_END = /\A(?:  \d+\) |Finished in |Failed examples:)/
       # Backtrace frames and RSpec's "Failure/Error: <source line>" differ per test; the error text is what must match.
@@ -16,6 +16,9 @@ module Coatepec
       module_function
 
       def call(text)
+        # read_bounded's tail byteslice can sever a multibyte character, and matching a regexp on that raises.
+        return text unless text.valid_encoding?
+
         lines = text.lines
         blocks = minitest_blocks(lines)
         blocks = rspec_blocks(lines) if blocks.empty?

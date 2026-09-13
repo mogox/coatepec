@@ -38,14 +38,21 @@ RSpec.describe Coatepec::Spec::Result do
     [out_r, err_r].compact.each(&:close)
   end
 
-  def build_with_stdout(text)
-    out_r, out_w = IO.pipe
+  def build_with_stdout(text, **opts)
+    out_r = stdout_handle(text)
     err_r, err_w = IO.pipe
-    out_w.write(text)
-    [out_w, err_w].each(&:close)
-    described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r, json_path: summary_file([]))
+    err_w.close
+    described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r, json_path: summary_file([]),
+                          **opts.slice(:include_passing, :include_stdout))
   ensure
     [out_r, err_r].compact.each(&:close)
+  end
+
+  # A payload past MAX_OUTPUT_BYTES would fill a pipe's buffer before build reads it, so hand over a file handle.
+  def stdout_handle(text)
+    path = File.join(tmpdir, "stdout-#{SecureRandom.hex(4)}.txt")
+    File.binwrite(path, text)
+    File.open(path)
   end
 
   it "omits passing examples by default, keeping failed and pending ones" do
@@ -99,6 +106,13 @@ RSpec.describe Coatepec::Spec::Result do
     expect(result[:stdout].scan("RuntimeError: boom").size).to eq(1)
     expect(result[:stdout]).to include("1 more test failed with this same error: T#test_b\n")
     expect(result[:stdout_truncated]).to be(false)
+  end
+
+  it "drops captured stdout text when include_stdout is false but still reports truncation" do
+    result = build_with_stdout("x" * (described_class::MAX_OUTPUT_BYTES + 1), include_stdout: false)
+
+    expect(result[:stdout]).to be_nil
+    expect(result[:stdout_truncated]).to be(true)
   end
 
   it "nulls stdout but keeps the key when include_stdout is false" do

@@ -2,10 +2,8 @@
 
 module Coatepec
   module Introspection
-    # Caps the array-valued entries of an already-sanitized validator options
-    # hash (see SafeOptions) before it's serialized as rails_model output.
-    # An inclusion list of 249 country codes says "validated against an allow-list"; the first few values suffice.
-    # The count and flag beside the cut list make it self-describing, so a short list and a cut one never look alike.
+    # Caps the array-valued entries of a sanitized validator options hash (see SafeOptions) for rails_model output:
+    # 249 country codes just say "allow-list", and the count plus flag beside a cut list keep it self-describing.
     module BoundedOptions
       module_function
 
