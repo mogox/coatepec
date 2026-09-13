@@ -180,13 +180,14 @@ module Coatepec
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool
       tool_name "rails_routes"
-      description "Return a bounded, filterable list of the Rails app's routes; engines: \"exclude\" returns " \
-                  "application routes only (the cheapest answer to \"what is the URL for X\"), \"only\" returns " \
-                  "mounted-engine routes only, and the default \"include\" lists both. Engine routes are expanded " \
-                  "one level deep, carry the mount point in their path, and name their engine in the engine " \
-                  "field (null for an application route; query also matches that field); returns up to limit " \
-                  "items (default 100) with next_offset -- the offset to pass back for the next page, null on " \
-                  "the last one"
+      description "Return a bounded, filterable list of the Rails app's routes, application routes only by " \
+                  "default: mounted-engine routes (admin scaffolding such as Avo) are withheld and the response's " \
+                  "engines_excluded says how many routes matching the query were held back; pass " \
+                  "engines: \"include\" to list both or \"only\" for engine routes alone. Engine routes are " \
+                  "expanded one level deep, carry the mount point in their path, and name their engine in the " \
+                  "engine field (null for an application route; query also matches that field); returns up to " \
+                  "limit items (default 100) with next_offset -- the offset to pass back for the next page, " \
+                  "null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
@@ -200,7 +201,7 @@ module Coatepec
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 100, offset: 0, engines: "include")
+        def call(server_context:, query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
           Response.ok(data: data, meta: meta_for(server_context, started_at))

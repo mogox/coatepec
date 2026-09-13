@@ -95,7 +95,7 @@ RSpec.describe Coatepec::Introspection::Routes do
     stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" }),
                  mount])
 
-    result = described_class.new.call
+    result = described_class.new(engines: "include").call
 
     expect(result[:items].last).to eq(
       { name: "audits", verb: "GET", path: "/widget_admin/audits(.:format)",
@@ -111,7 +111,7 @@ RSpec.describe Coatepec::Introspection::Routes do
                  double(name: nil, verb: "", path: double(spec: "/widget_admin"), defaults: {},
                         app: double(engine?: true, rack_app: engine))])
 
-    result = described_class.new(query: "widgetadmin").call
+    result = described_class.new(query: "widgetadmin", engines: "include").call
 
     expect(result[:matched]).to eq(1)
     expect(result[:items].map { |r| r[:engine] }).to eq(["WidgetAdmin::Engine"])
@@ -134,12 +134,35 @@ RSpec.describe Coatepec::Introspection::Routes do
                         app: double(engine?: true, rack_app: engine))])
   end
 
-  it "includes engine routes by default" do
+  it "withholds engine routes by default and reports how many" do
     app_and_engine_routes
 
     result = described_class.new.call
 
+    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin])
+    expect(result[:engines]).to eq("exclude")
+    expect(result[:engines_excluded]).to eq(1)
+    expect(result.keys).to eq(%i[items matched limit offset next_offset engines engines_excluded])
+  end
+
+  it "includes engine routes and reports zero excluded when engines is include" do
+    app_and_engine_routes
+
+    result = described_class.new(engines: "include").call
+
     expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin audits])
+    expect(result).to include(engines: "include", engines_excluded: 0)
+  end
+
+  # The count is of withheld routes that matched the query, so a caller knows what this exact call hid.
+  it "counts only withheld routes that match the query" do
+    app_and_engine_routes
+
+    result = described_class.new(query: "audit").call
+
+    expect(result[:items]).to eq([])
+    expect(result[:matched]).to eq(0)
+    expect(result[:engines_excluded]).to eq(1)
   end
 
   it "returns application routes only, mount route included, when engines is exclude" do
@@ -149,6 +172,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin])
     expect(result[:matched]).to eq(2)
+    expect(result[:engines_excluded]).to eq(1)
   end
 
   it "returns engine routes only when engines is only" do
@@ -158,9 +182,10 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     expect(result[:items].map { |r| r[:name] }).to eq(%w[audits])
     expect(result[:matched]).to eq(1)
+    expect(result).to include(engines: "only", engines_excluded: 2)
   end
 
-  # Filtering before the query keeps matched/next_offset consistent with the items actually returned.
+  # The query runs first so matched/next_offset describe the kept page and engines_excluded this query's omissions.
   it "applies the engine filter before the query match and the page" do
     app_and_engine_routes
 
@@ -169,6 +194,7 @@ RSpec.describe Coatepec::Introspection::Routes do
     expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets])
     expect(result[:matched]).to eq(2)
     expect(result[:next_offset]).to eq(1)
+    expect(result[:engines_excluded]).to eq(1)
   end
 
   it "rejects an unknown engines value" do

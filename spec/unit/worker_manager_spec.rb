@@ -73,7 +73,7 @@ RSpec.describe Coatepec::WorkerManager do
   end
 
   describe "#routes" do
-    it "dispatches engines, defaulting it to include" do
+    it "dispatches engines, defaulting it to exclude" do
       client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { items: [] })
       allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
 
@@ -81,7 +81,7 @@ RSpec.describe Coatepec::WorkerManager do
       manager.routes(query: "talk", engines: "only")
 
       expect(client).to have_received(:request)
-        .with("routes", { query: "talk", limit: 100, offset: 0, engines: "include" }, timeout: 30).ordered
+        .with("routes", { query: "talk", limit: 100, offset: 0, engines: "exclude" }, timeout: 30).ordered
       expect(client).to have_received(:request)
         .with("routes", { query: "talk", limit: 100, offset: 0, engines: "only" }, timeout: 30).ordered
     end
