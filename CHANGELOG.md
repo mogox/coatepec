@@ -67,6 +67,10 @@
   naming the other tests -- a 5-error controller run drops from ~4,850 B to
   roughly a third of that. Backtrace frames and RSpec's `Failure/Error:`
   source line are ignored when deciding that two blocks match.
+- `rails_spec_run`/`rails_test_run` gain `include_stdout` (default `true`).
+  `include_stdout: false` returns `stdout: null` -- the key stays so the result
+  shape is uniform -- for callers that only read `summary` and `examples`.
+  `stderr` is always returned.
 
 ## 0.7.0
 

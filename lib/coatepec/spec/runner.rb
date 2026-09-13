@@ -18,14 +18,14 @@ module Coatepec
       end
 
       def run(paths:, example: nil, seed: nil, fail_fast: false, timeout_seconds: DEFAULT_TIMEOUT,
-              include_passing: false)
+              include_passing: false, include_stdout: true)
         validated = @path_policy.validate!(paths)
         adapter = adapter_for(validated[:framework])
         adapter.require_framework!
         args = adapter.build_args(validated[:selectors], example, seed, fail_fast)
 
         strategy_class.new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
-                      .run(args, timeout_seconds, include_passing: include_passing)
+                      .run(args, timeout_seconds, include_passing: include_passing, include_stdout: include_stdout)
       end
 
       private

@@ -13,7 +13,8 @@ module Coatepec
           seed: { type: %w[integer null], minimum: 0, maximum: 65_535 },
           fail_fast: { type: "boolean" },
           timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
-          include_passing: { type: "boolean" }
+          include_passing: { type: "boolean" },
+          include_stdout: { type: "boolean" }
         },
         required: ["paths"],
         additionalProperties: false
@@ -22,17 +23,18 @@ module Coatepec
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
-                  "; returns only failed and pending examples unless include_passing is true"
+                  "; returns only failed and pending examples unless include_passing is true" \
+                  "; pass include_stdout: false to drop the captured stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-                 include_passing: false)
+                 include_passing: false, include_stdout: true)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
-            include_passing: include_passing
+            include_passing: include_passing, include_stdout: include_stdout
           )
           Response.ok(data: data, meta: meta_for(server_context, started_at))
         rescue Coatepec::Error => e
@@ -56,7 +58,8 @@ module Coatepec
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
                   "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
-                  "; returns only failed and pending examples unless include_passing is true"
+                  "; returns only failed and pending examples unless include_passing is true" \
+                  "; pass include_stdout: false to drop the captured stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
     end

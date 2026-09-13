@@ -41,8 +41,9 @@ module Coatepec
         @spawn_strategy = SpawnStrategy.new(project_root, adapter: @adapter)
       end
 
-      def run(args, timeout_seconds, include_passing: false)
-        return fallback_result(args, timeout_seconds, "spawn_fallback", include_passing) unless guard_passes?
+      def run(args, timeout_seconds, include_passing: false, include_stdout: true)
+        result_options = { include_passing: include_passing, include_stdout: include_stdout }
+        return fallback_result(args, timeout_seconds, "spawn_fallback", result_options) unless guard_passes?
 
         started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         begin
@@ -53,20 +54,20 @@ module Coatepec
           # caller's side that is indistinguishable from a failed guard, hence
           # the same mode. Opting into macos_fork must never surface an error
           # that plain SpawnStrategy wouldn't have.
-          return fallback_result(args, timeout_seconds, "spawn_fallback", include_passing)
+          return fallback_result(args, timeout_seconds, "spawn_fallback", result_options)
         end
         return result.merge(execution_mode: "fork") unless crashed?(result)
 
-        retry_after_crash(args, timeout_seconds, started_at, result, include_passing)
+        retry_after_crash(args, timeout_seconds, started_at, result, result_options)
       end
 
       private
 
-      def retry_after_crash(args, timeout_seconds, started_at, crashed, include_passing)
+      def retry_after_crash(args, timeout_seconds, started_at, crashed, result_options)
         elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
         remaining = [timeout_seconds - elapsed, MIN_RETRY_TIMEOUT_SECONDS].max
 
-        fallback_result(args, remaining, "spawn_after_crash", include_passing)
+        fallback_result(args, remaining, "spawn_after_crash", result_options)
           .merge(crashed_fork_stderr: crash_diagnostics(crashed))
       end
 
@@ -79,8 +80,8 @@ module Coatepec
         text.byteslice(-MAX_CRASH_STDERR_BYTES, MAX_CRASH_STDERR_BYTES)
       end
 
-      def fallback_result(args, timeout_seconds, mode, include_passing)
-        @spawn_strategy.run(args, timeout_seconds, include_passing: include_passing).merge(execution_mode: mode)
+      def fallback_result(args, timeout_seconds, mode, result_options)
+        @spawn_strategy.run(args, timeout_seconds, **result_options).merge(execution_mode: mode)
       end
 
       def guard_passes?

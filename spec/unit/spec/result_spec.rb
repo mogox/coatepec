@@ -33,7 +33,7 @@ RSpec.describe Coatepec::Spec::Result do
     [out_w, err_w].each(&:close)
     described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r,
                           json_path: summary_file(examples, **opts.slice(:pending_count)),
-                          **opts.slice(:include_passing))
+                          **opts.slice(:include_passing, :include_stdout))
   ensure
     [out_r, err_r].compact.each(&:close)
   end
@@ -99,5 +99,14 @@ RSpec.describe Coatepec::Spec::Result do
     expect(result[:stdout].scan("RuntimeError: boom").size).to eq(1)
     expect(result[:stdout]).to include("1 more test failed with this same error: T#test_b\n")
     expect(result[:stdout_truncated]).to be(false)
+  end
+
+  it "nulls stdout but keeps the key when include_stdout is false" do
+    result = build([example("b", "failed")], include_stdout: false)
+
+    expect(result).to have_key(:stdout)
+    expect(result[:stdout]).to be_nil
+    expect(result[:stderr]).to eq("")
+    expect(result.keys.index(:stdout)).to eq(result.keys.index(:stdout_truncated) - 1)
   end
 end

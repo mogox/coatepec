@@ -55,6 +55,21 @@ RSpec.describe Coatepec::WorkerManager do
       expect(client).to have_received(:request)
         .with("spec_run", hash_including(include_passing: true), timeout: 40).ordered
     end
+
+    it "dispatches include_stdout, defaulting it to true" do
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { status: "passed" })
+      allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
+
+      manager.run_spec(paths: ["spec/models/widget_spec.rb"], example: nil, seed: nil, fail_fast: false,
+                       timeout_seconds: 30)
+      manager.run_spec(paths: ["spec/models/widget_spec.rb"], example: nil, seed: nil, fail_fast: false,
+                       timeout_seconds: 30, include_stdout: false)
+
+      expect(client).to have_received(:request)
+        .with("spec_run", hash_including(include_stdout: true), timeout: 40).ordered
+      expect(client).to have_received(:request)
+        .with("spec_run", hash_including(include_stdout: false), timeout: 40).ordered
+    end
   end
 
   describe "#check_flaky" do
