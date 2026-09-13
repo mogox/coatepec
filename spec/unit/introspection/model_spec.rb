@@ -72,7 +72,7 @@ RSpec.describe Coatepec::Introspection::Model do
   end
 
   describe "#build_metadata sections (private, unit-level)" do
-    # A Struct stands in for an ActiveRecord class: build_metadata only calls these five readers on it.
+    # A Struct stands in for an ActiveRecord class: build_metadata only calls these eight readers on it.
     let(:klass) do
       Struct.new(:name, :abstract_class?, :table_name, :primary_key, :columns, :reflect_on_all_associations,
                  :validators, :defined_enums).new("Widget", false, "widgets", "id", [], [], [], {})
@@ -100,6 +100,11 @@ RSpec.describe Coatepec::Introspection::Model do
 
     it "rejects an unknown field" do
       expect { described_class.new("Widget", fields: %w[columns rows]) }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_model_fields) }
+    end
+
+    it "rejects fields that is not an array" do
+      expect { described_class.new("Widget", fields: "columns") }
         .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_model_fields) }
     end
   end

@@ -7,14 +7,14 @@ before they're designed, not a promise.
 ## Minitest support -- shipped in 0.8.0
 
 Shipped through the existing `rails_spec_run`/`rails_spec_flaky_check`
-tools (plus `rails_test_run`/`rails_test_flaky_check` aliases). The open
-questions resolved as: one tool, dispatching by *selector shape*
-(`test/**/*_test.rb` vs `spec/**/*_spec.rb`) rather than by Gemfile, since
-that is per-request and unambiguous for apps with both; structured
-per-test output comes from an in-process `Minitest::AbstractReporter`
-writing RSpec's JSON shape, so `Spec::Result` and `FlakyChecker` were
-reused unchanged; and Minitest's `--seed` is a direct equivalent (16-bit,
-random order by default), so the flaky checker works as-is. See
+tools. The open questions resolved as: one tool, dispatching by
+*selector shape* (`test/**/*_test.rb` vs `spec/**/*_spec.rb`) rather
+than by Gemfile, since that is per-request and unambiguous for apps
+with both; structured per-test output comes from an in-process
+`Minitest::AbstractReporter` writing RSpec's JSON shape, so
+`Spec::Result` and `FlakyChecker` were reused unchanged; and Minitest's
+`--seed` is a direct equivalent (16-bit, random order by default), so
+the flaky checker works as-is. See
 `docs/superpowers/specs/2026-09-05-minitest-support-design.md` (local-only)
 for the design and the line-filtering finding.
 

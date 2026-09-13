@@ -6,14 +6,14 @@ require "coatepec/mcp/response"
 RSpec.describe Coatepec::MCP::Response do
   describe ".ok" do
     it "wraps data and meta in an ok envelope" do
-      response = described_class.ok(data: { foo: "bar" }, meta: { environment: "test" })
+      response = described_class.ok(data: { foo: "bar" }, meta: { duration_ms: 3 })
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
       expect(payload).to eq(
         "ok" => true,
         "data" => { "foo" => "bar" },
-        "meta" => { "environment" => "test" }
+        "meta" => { "duration_ms" => 3 }
       )
     end
 

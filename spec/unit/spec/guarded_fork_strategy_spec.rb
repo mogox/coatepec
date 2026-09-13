@@ -118,5 +118,9 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy do
 
       expect(strategy.send(:crashed?, result)).to be(false)
     end
+
+    it "treats a result without process fields as a normal exit" do
+      expect(strategy.send(:crashed?, {})).to be(false)
+    end
   end
 end

@@ -74,7 +74,7 @@ RSpec.describe Coatepec::WorkerManager do
 
   describe "#routes" do
     it "dispatches engines, defaulting it to exclude" do
-      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { items: [] })
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { rows: [] })
       allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
 
       manager.routes(query: "talk")

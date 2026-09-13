@@ -6,11 +6,10 @@
   smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
   process to restore indentation.
 - `rails_spec_run` now omits passing examples from `examples` by default --
-  a 49-test green run drops from ~3,700 tokens to ~160 -- and `summary`
-  gains `pending_count`. Pass the new
-  `include_passing: true` input to get the full roster back (still capped at
-  500 examples). `rails_spec_flaky_check` is unaffected: it still sees every
-  example.
+  a 49-test green run drops from ~3,700 tokens to ~160 -- and `summary` gains
+  `pending_count`. Pass the new `include_passing: true` input to get the full
+  roster back (still capped at 500 examples). `rails_spec_flaky_check` is
+  unaffected: it still sees every example.
 - `examples[].description` (and `flaky_examples[].description`) is omitted
   when it would only repeat `id`, which is always the case for Minitest.
 - `rails_routes` (with `engines: "include"`) and `rails_controller` now
@@ -20,12 +19,12 @@
   point, so `/widget_admin/audits` is what both tools report, and a
   controller living inside an engine no longer has all of its actions listed
   under `unroutable_actions`.
-- `rails_routes` rows and `rails_controller`'s `actions[].routes` entries
-  gain an `engine` field: `null` for an application route, the engine's class
-  name otherwise. `rails_routes`' `query` matches against it like every other
-  column, so `query: "Avo::Engine"` with `engines: "include"` or `"only"`
-  returns exactly that engine's routes. Application routes are listed before
-  engine routes.
+- `rails_routes` gains an `engine` column and `rails_controller`'s
+  `actions[].routes` entries an `engine` field: `null` for an application
+  route, the engine's class name otherwise. `rails_routes`' `query` matches
+  against it like every other column, so `query: "Avo::Engine"` with
+  `engines: "include"` or `"only"` returns exactly that engine's routes.
+  Application routes are listed before engine routes.
 - An engine route's `name` (`route_name` in `rails_controller`) is relative
   to its engine: it is reached through the mount's helper,
   `<mount name>.<name>_path`, where the mount name is the `name` of the mount
@@ -92,7 +91,7 @@
 - `rails_spec_run` results carry `child_pid`, `signaled`, `termsig`,
   `stopsig` and `coredump` only when the child did not exit normally (a
   timeout kill or a crash); a normal run reports `status`, `exit_code` and
-  the output fields alone.
+  the output fields alongside the usual `summary` and `examples`.
 - `rails_model` always returns `counts` (the size of each of its four lists,
   after validator de-duplication and the 200-item caps) and gains `fields`,
   an array of `columns`/`associations`/`validators`/`enums` naming the lists

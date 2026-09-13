@@ -51,14 +51,15 @@ module Coatepec
       end
     end
 
-    # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
-    # versions, PID, boot_id, lifecycle state and the project root. Worker::Server#handle boots
-    # the Rails runtime before dispatching any command, so the first call to
-    # this tool starts (and blocks on) a full Rails boot just like a spec run.
+    # The `rails_runtime_status` MCP tool: reports the test worker's
+    # Ruby/Rails versions, PID, boot_id, lifecycle state and the project
+    # root. Worker::Server#handle boots the Rails runtime before dispatching
+    # any command, so the first call to this tool starts (and blocks on) a
+    # full Rails boot just like a spec run.
     class RuntimeStatusTool < ::MCP::Tool
       tool_name "rails_runtime_status"
       description "Report the Coatepec test worker's identity and boot status " \
-                  "(boots the warm worker if it is not up yet)"
+                  "(boots the warm worker if it is not up yet); includes the project root as project_root"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(properties: {}, required: [], additionalProperties: false)
 
@@ -174,12 +175,12 @@ module Coatepec
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
       description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data; counts (the size of each of those four lists) is always present, and fields " \
-                  "(any of columns, associations, validators, enums) limits which lists are returned -- fields: [] " \
-                  "is the cheapest way to answer a how-many question; validators are de-duplicated by class, " \
-                  "attributes and options, so the list holds distinct validators and can be shorter than " \
-                  "klass.validators; an array-valued validator option longer than 20 entries keeps its first 20 " \
-                  "with <option>_count and <option>_truncated beside it"
+                  "without row data; counts (the size of each of those four lists, each capped at 200) is always " \
+                  "present, and fields (any of columns, associations, validators, enums) limits which lists are " \
+                  "returned -- fields: [] is the cheapest way to answer a how-many question; validators are " \
+                  "de-duplicated by class, attributes and options, so the list holds distinct validators and can " \
+                  "be shorter than klass.validators; an array-valued validator option longer than 20 entries " \
+                  "keeps its first 20 with <option>_count and <option>_truncated beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

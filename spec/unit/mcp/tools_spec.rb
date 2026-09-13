@@ -84,6 +84,10 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(payload["data"]).to eq("environment" => "test", "project_root" => "/app")
     end
+
+    it "documents project_root" do
+      expect(described_class.description).to include("project_root")
+    end
   end
 
   describe Coatepec::MCP::RuntimeRestartTool do

@@ -134,7 +134,7 @@ a no-op.
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state, and the project root (`project_root`) |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) | Returns `columns` (`name`, `verb`, `path`, `controller`, `action`, `engine`) and `rows` in that order; paths omit the `(.:format)` suffix Rails appends. Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
-| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`), `fields?` (any of `columns`, `associations`, `validators`, `enums`; default all) | always returns `counts` (the size of each of the four lists), then only the requested lists -- `fields: []` answers a how-many question in a few dozen bytes; ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`), `fields?` (any of `columns`, `associations`, `validators`, `enums`; default all) | Always returns `counts` (the size of each of the four lists), then only the requested lists -- `fields: []` answers a how-many question in a few dozen bytes; ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
 
@@ -199,9 +199,9 @@ a no-op.
 - "What actions does WidgetsController define, and what routes reach them?" --
   `rails_controller(name: "WidgetsController")` -- see `actions[].routes`,
   each with `verb`, `path` (without the `(.:format)` suffix -- byte-identical
-  to the same route's `path` from `rails_routes`),
-  `route_name`, and `engine` (`null` for an application route, the engine's
-  class name for a route that reaches this controller through a mount).
+  to the same route's `path` from `rails_routes`), `route_name`, and `engine`
+  (`null` for an application route, the engine's class name for a route that
+  reaches this controller through a mount).
 - "Does this controller have dead code, or a route that will 500?" -- same
   call -- see `unroutable_actions` (action methods no route reaches --
   probably dead code) and `routes_without_action` (action names the route

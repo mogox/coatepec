@@ -41,6 +41,10 @@ module Coatepec
 
       # The MCP schema enforces the enum; this guards the worker command against any other caller.
       def validate_fields!(fields)
+        unless fields.is_a?(Array)
+          raise Coatepec::Error.new(:invalid_model_fields, "fields must be an array, got #{fields.inspect}")
+        end
+
         unknown = fields - FIELDS
         return fields if unknown.empty?
 
