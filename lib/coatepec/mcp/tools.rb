@@ -20,7 +20,7 @@ module Coatepec
         additionalProperties: false
       }.freeze
 
-      # Both tool names share this clause, so the wording cannot drift between them.
+      # Kept a constant so the vocabulary clause stays readable next to the rest of the description.
       RSPEC_VOCABULARY =
         "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
         "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
@@ -29,7 +29,7 @@ module Coatepec
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector " \
-                  "paths#{RSPEC_VOCABULARY}" \
+                  "paths; there is no separate Minitest tool#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
@@ -49,22 +49,6 @@ module Coatepec
           Response.error(e)
         end
       end
-    end
-
-    # Alias of rails_spec_run for agents that reason from "this app uses
-    # Minitest". Same schema object, same inherited #call; only the name
-    # and description differ. The mcp gem's Tool.inherited resets every
-    # declared attribute on a subclass, so each must be redeclared here.
-    class TestRunTool < SpecRunTool
-      tool_name "rails_test_run"
-      description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
-                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either " \
-                  "name#{RSPEC_VOCABULARY}" \
-                  "; returns only failed and pending examples unless include_passing is true" \
-                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(**INPUT_SCHEMA)
     end
 
     # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
@@ -146,16 +130,6 @@ module Coatepec
           Response.error(e)
         end
       end
-    end
-
-    # Alias of rails_spec_flaky_check; see TestRunTool for why the
-    # attributes are redeclared.
-    class TestFlakyCheckTool < FlakyCheckTool
-      tool_name "rails_test_flaky_check"
-      description "Alias of rails_spec_flaky_check: rerun targeted Minitest tests or RSpec examples with random " \
-                  "seeds to detect flakiness -- identical behaviour under either name"
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(**INPUT_SCHEMA)
     end
 
     # The `rails_routes` MCP tool: lists/filters/paginates the target

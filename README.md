@@ -131,14 +131,12 @@ a no-op.
 | Tool | Input | Notes |
 |---|---|---|
 | `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?`, `include_stdout?` (`failures` default, `always`, `never`) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; failure blocks in `stdout` that repeat an earlier block's error verbatim are replaced by a roll-up line naming the tests; returns `summary` counts plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples); `stdout` is returned only for failing runs by default; `include_stdout: "always"` keeps it for green runs, `"never"` drops it always (the key stays, `null`); `stderr` is always returned; `child_pid`/`signaled`/`termsig`/`stopsig`/`coredump` appear only when the child did not exit normally (a timeout kill or a crash) |
-| `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state, and the project root (`project_root`) |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) | Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
-| `rails_test_flaky_check` | same as `rails_spec_flaky_check` | Alias of `rails_spec_flaky_check` |
 
 ### Example queries
 
@@ -290,11 +288,11 @@ worker). For most apps this is invisible, but if you ever see behavior differ
 between Coatepec and your own `bundle exec rspec`, this is the first thing to
 suspect.
 
-`rails_test_run` (Minitest):
+Minitest through `rails_spec_run`:
 
-- "Run this Minitest file" -- `rails_test_run(paths: ["test/models/widget_test.rb"])`,
-  or the same call through `rails_spec_run`; the framework is decided by the
-  path, not the tool name. `test/models/widget_test.rb:12` runs the one test
+- "Run this Minitest file" -- `rails_spec_run(paths: ["test/models/widget_test.rb"])`;
+  the framework is decided by the path, and there is no separate
+  Minitest-named tool. `test/models/widget_test.rb:12` runs the one test
   whose definition spans line 12, and a directory runs every `_test.rb`
   under it.
 - `example:` is a substring match on the test's method name

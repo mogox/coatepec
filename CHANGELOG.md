@@ -5,9 +5,9 @@
 - Tool responses are now compact JSON rather than pretty-printed (22-32%
   smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
   process to restore indentation.
-- `rails_spec_run` and `rails_test_run` now omit passing examples from
-  `examples` by default -- a 49-test green run drops from ~3,700 tokens to
-  ~160 -- and `summary` gains `pending_count`. Pass the new
+- `rails_spec_run` now omits passing examples from `examples` by default --
+  a 49-test green run drops from ~3,700 tokens to ~160 -- and `summary`
+  gains `pending_count`. Pass the new
   `include_passing: true` input to get the full roster back (still capped at
   500 examples). `rails_spec_flaky_check` is unaffected: it still sees every
   example.
@@ -42,9 +42,6 @@
   `"failed"`). The framework is chosen per call from the selector paths --
   an app that has both `spec/` and `test/` works without configuration; one
   call may not mix the two (`mixed_test_frameworks`).
-- Add `rails_test_run` and `rails_test_flaky_check` as aliases of the two
-  tools above, for agents that look for a Minitest-named tool. Identical
-  schema and behaviour.
 - The Minitest child sets `PARALLEL_WORKERS=1`, so a selection above Rails'
   parallelization threshold runs serially under the call's single timeout
   instead of forking a worker tree.
@@ -62,9 +59,9 @@
 - `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
   roughly doubled route counts when engines are included) and returns
   `next_offset` for the follow-up call, `null` on the last page.
-- `rails_spec_run`/`rails_test_run`: when several tests fail with the same
-  error text (a broken layout erroring every controller test, say), `stdout`
-  keeps the first failure block and replaces each repeat with one roll-up line
+- `rails_spec_run`: when several tests fail with the same error text (a
+  broken layout erroring every controller test, say), `stdout` keeps the
+  first failure block and replaces each repeat with one roll-up line
   naming the other tests -- a 5-error controller run drops from ~4,850 B to
   roughly a third of that. Backtrace frames and RSpec's `Failure/Error:`
   source line are ignored when deciding that two blocks match.
