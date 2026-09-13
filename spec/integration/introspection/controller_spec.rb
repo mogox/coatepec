@@ -88,7 +88,7 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
 
     index = result["actions"].find { |a| a["name"] == "index" }
     expect(index["routes"].map { |r| r["verb"] }).to eq(["GET"])
-    expect(index["routes"].first["path"]).to eq("/widgets(.:format)")
+    expect(index["routes"].first["path"]).to eq("/widgets")
     # An application route carries a null engine, the same marker rails_routes reports.
     expect(index["routes"].first["engine"]).to be_nil
 
@@ -108,7 +108,7 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
 
     expect(result["controller_path"]).to eq("admin/reports")
     index = result["actions"].find { |a| a["name"] == "index" }
-    expect(index["routes"].first["path"]).to eq("/admin/reports(.:format)")
+    expect(index["routes"].first["path"]).to eq("/admin/reports")
   end
 
   it "cross-references a controller inside a mounted engine against the engine's own routes" do
@@ -120,11 +120,11 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     # Mount point on the path (byte-identical to rails_routes) and `engine` set, so the route
     # cannot be mistaken for an application one.
     expect(index["routes"])
-      .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits(.:format)", "route_name" => "audits",
+      .to eq([{ "verb" => "GET", "path" => "/widget_admin/audits", "route_name" => "audits",
                 "engine" => "WidgetAdmin::Engine" }])
 
     show = result["actions"].find { |a| a["name"] == "show" }
-    expect(show["routes"].first["path"]).to eq("/widget_admin/audits/:id(.:format)")
+    expect(show["routes"].first["path"]).to eq("/widget_admin/audits/:id")
 
     # The engine routes index/show only, so `export` stays genuinely unroutable.
     expect(result["unroutable_actions"]).to eq(["export"])
@@ -144,7 +144,7 @@ RSpec.describe Coatepec::Introspection::Controller, type: :integration do
     expect(result["controller_path"]).to eq("pings")
     expect(result["actions"].map { |a| a["name"] }).to include("index")
     index = result["actions"].find { |a| a["name"] == "index" }
-    expect(index["routes"].first["path"]).to eq("/pings(.:format)")
+    expect(index["routes"].first["path"]).to eq("/pings")
 
     # Proves the concern slice resolves to ActionController::API for an
     # API-only controller, not just ActionController::Base: if framework_base

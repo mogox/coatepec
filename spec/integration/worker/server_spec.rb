@@ -103,8 +103,9 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     response = protocol.read
 
     expect(response[:ok]).to be(true)
-    expect(response[:data][:items]).not_to be_empty
-    expect(response[:data][:items].first[:controller]).to eq("widgets")
+    expect(response[:data][:rows]).not_to be_empty
+    controller_index = response[:data][:columns].index("controller")
+    expect(response[:data][:rows].first[controller_index]).to eq("widgets")
   end
 
   it "answers a model command" do

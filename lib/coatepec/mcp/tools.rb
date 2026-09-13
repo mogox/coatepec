@@ -142,9 +142,10 @@ module Coatepec
                   "(application routes, under \"only\"); pass " \
                   "engines: \"include\" to list both or \"only\" for engine routes alone. Engine routes are " \
                   "expanded one level deep, carry the mount point in their path, and name their engine in the " \
-                  "engine field (null for an application route; query also matches that field); returns up to " \
-                  "limit items (default 100) with next_offset -- the offset to pass back for the next page, " \
-                  "null on the last one"
+                  "engine field (null for an application route; query also matches that field); returns columns " \
+                  "(name, verb, path, controller, action, engine) and up to limit rows (default 100) in that " \
+                  "order, paths without the (.:format) suffix Rails appends, with next_offset -- the offset to " \
+                  "pass back for the next page, null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

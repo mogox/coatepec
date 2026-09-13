@@ -17,10 +17,10 @@
   include the routes of engines mounted in the application, expanded one
   level deep (an engine mounted inside another engine stays an opaque mount
   route, the same boundary `bin/rails routes` draws). Paths carry the mount
-  point, so `/widget_admin/audits(.:format)` is what both tools report, and a
+  point, so `/widget_admin/audits` is what both tools report, and a
   controller living inside an engine no longer has all of its actions listed
   under `unroutable_actions`.
-- `rails_routes` items and `rails_controller`'s `actions[].routes` entries
+- `rails_routes` rows and `rails_controller`'s `actions[].routes` entries
   gain an `engine` field: `null` for an application route, the engine's class
   name otherwise. `rails_routes`' `query` matches against it like every other
   column, so `query: "Avo::Engine"` with `engines: "include"` or `"only"`
@@ -56,7 +56,7 @@
   options into one entry (a concern and the model body declaring the same
   validation used to appear twice); the 200-item cap now counts distinct
   validators.
-- `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
+- `rails_routes` defaults to 100 routes per page (was 50 -- engine expansion
   roughly doubled route counts when engines are included) and returns
   `next_offset` for the follow-up call, `null` on the last page.
 - `rails_spec_run`: when several tests fail with the same error text (a
@@ -97,6 +97,11 @@
   after validator de-duplication and the 200-item caps) and gains `fields`,
   an array of `columns`/`associations`/`validators`/`enums` naming the lists
   to return; omitted means all, `[]` means counts only.
+- `rails_routes` returns `columns` (`name`, `verb`, `path`, `controller`,
+  `action`, `engine`) and `rows` instead of one object per route -- the six
+  key names were a third of every item's bytes -- and both `rails_routes`
+  and `rails_controller` report paths without the `(.:format)` suffix Rails
+  appends to most routes.
 
 ## 0.7.0
 

@@ -118,6 +118,7 @@ RSpec.describe "Coatepec MCP tools" do
 
     it "tells the client how to page through the results" do
       expect(described_class.description).to include("next_offset")
+      expect(described_class.description).to include("rows")
     end
 
     it "says engine routes are withheld by default, names the count field and declares the enum" do
@@ -130,8 +131,8 @@ RSpec.describe "Coatepec MCP tools" do
     end
 
     it "forwards engines to the worker manager and defaults it to exclude" do
-      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
-                                                           next_offset: nil)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
 
       described_class.call(server_context: server_context)
       described_class.call(engines: "include", server_context: server_context)
@@ -143,18 +144,18 @@ RSpec.describe "Coatepec MCP tools" do
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
         .with(query: "widgets", limit: 50, offset: 0, engines: "exclude")
-        .and_return(items: [], matched: 0, limit: 50, offset: 0)
+        .and_return(columns: [], rows: [], matched: 0, limit: 50, offset: 0)
 
       response = described_class.call(query: "widgets", limit: 50, offset: 0, server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
-      expect(payload["data"]).to eq("items" => [], "matched" => 0, "limit" => 50, "offset" => 0)
+      expect(payload["data"]).to eq("columns" => [], "rows" => [], "matched" => 0, "limit" => 50, "offset" => 0)
     end
 
     it "defaults limit to 100" do
-      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
-                                                           next_offset: nil)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
 
       described_class.call(server_context: server_context)
 
