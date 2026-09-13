@@ -173,23 +173,27 @@ module Coatepec
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
       description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data; validators are de-duplicated by class, attributes and options, so the list " \
-                  "holds distinct validators and can be shorter than klass.validators; an array-valued validator " \
-                  "option longer than 20 entries keeps its first 20 with <option>_count and <option>_truncated " \
-                  "beside it"
+                  "without row data; counts (the size of each of those four lists) is always present, and fields " \
+                  "(any of columns, associations, validators, enums) limits which lists are returned -- fields: [] " \
+                  "is the cheapest way to answer a how-many question; validators are de-duplicated by class, " \
+                  "attributes and options, so the list holds distinct validators and can be shorter than " \
+                  "klass.validators; an array-valued validator option longer than 20 entries keeps its first 20 " \
+                  "with <option>_count and <option>_truncated beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
-          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' }
+          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' },
+          fields: { type: "array", items: { type: "string", enum: %w[columns associations validators enums] },
+                    uniqueItems: true }
         },
         required: ["name"],
         additionalProperties: false
       )
 
       class << self
-        def call(name:, server_context:)
+        def call(name:, server_context:, fields: nil)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].model(name: name)
+          data = server_context[:worker_manager].model(name: name, fields: fields)
           Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)

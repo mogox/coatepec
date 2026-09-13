@@ -87,6 +87,21 @@ RSpec.describe Coatepec::WorkerManager do
     end
   end
 
+  describe "#model" do
+    it "dispatches fields, defaulting it to nil (every section)" do
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { name: "Widget" })
+      allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
+
+      manager.model(name: "Widget")
+      manager.model(name: "Widget", fields: ["enums"])
+
+      expect(client).to have_received(:request)
+        .with("model", { name: "Widget", fields: nil }, timeout: 30).ordered
+      expect(client).to have_received(:request)
+        .with("model", { name: "Widget", fields: ["enums"] }, timeout: 30).ordered
+    end
+  end
+
   describe "#check_flaky" do
     it "scales its dispatch timeout slack with runs, on top of the flat base" do
       client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { rounds: [] })

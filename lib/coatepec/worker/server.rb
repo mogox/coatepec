@@ -64,7 +64,8 @@ module Coatepec
       end
 
       def handle_model(args)
-        Introspection::Model.new(args.transform_keys(&:to_sym)[:name]).call
+        a = args.transform_keys(&:to_sym)
+        Introspection::Model.new(a[:name], fields: a[:fields]).call
       end
 
       def handle_controller(args)

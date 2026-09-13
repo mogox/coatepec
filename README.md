@@ -134,7 +134,7 @@ a no-op.
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state, and the project root (`project_root`) |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
 | `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) | Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
-| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`), `fields?` (any of `columns`, `associations`, `validators`, `enums`; default all) | always returns `counts` (the size of each of the four lists), then only the requested lists -- `fields: []` answers a how-many question in a few dozen bytes; ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
 
@@ -182,6 +182,9 @@ a no-op.
   `columns[].default`.
 - "What validations and associations does Widget enforce?" -- same call --
   see `validators` and `associations`.
+- "How many columns, associations, validators and enums does Event have?" --
+  `rails_model(name: "Event", fields: [])` -- see `counts`; the full lists cost
+  nothing extra to ask for later.
 - A long allow-list is summarised, not enumerated: `validates :country_code,
   inclusion: { in: ISO_CODES }` with 249 codes comes back as `"in"` holding
   the first 20, `"in_count": 249` and `"in_truncated": true`. A list of 20 or

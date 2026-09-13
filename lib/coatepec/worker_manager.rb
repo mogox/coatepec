@@ -46,8 +46,8 @@ module Coatepec
       dispatch("routes", { query: query, limit: limit, offset: offset, engines: engines }, timeout: 30)
     end
 
-    def model(name:)
-      dispatch("model", { name: name }, timeout: 30)
+    def model(name:, fields: nil)
+      dispatch("model", { name: name, fields: fields }, timeout: 30)
     end
 
     def controller(name:)

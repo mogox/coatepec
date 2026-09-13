@@ -93,6 +93,10 @@
   `stopsig` and `coredump` only when the child did not exit normally (a
   timeout kill or a crash); a normal run reports `status`, `exit_code` and
   the output fields alone.
+- `rails_model` always returns `counts` (the size of each of its four lists,
+  after validator de-duplication and the 200-item caps) and gains `fields`,
+  an array of `columns`/`associations`/`validators`/`enums` naming the lists
+  to return; omitted means all, `[]` means counts only.
 
 ## 0.7.0
 

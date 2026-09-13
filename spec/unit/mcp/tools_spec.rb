@@ -179,13 +179,26 @@ RSpec.describe "Coatepec MCP tools" do
     end
 
     it "returns an ok envelope with the model data" do
-      allow(worker_manager).to receive(:model).with(name: "Widget").and_return(name: "Widget", columns: [])
+      allow(worker_manager).to receive(:model)
+        .with(name: "Widget", fields: nil).and_return(name: "Widget", columns: [])
 
       response = described_class.call(name: "Widget", server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
       expect(payload["data"]).to eq("name" => "Widget", "columns" => [])
+    end
+
+    it "forwards fields to the worker manager and declares it as an enum array" do
+      allow(worker_manager).to receive(:model).and_return(name: "Widget")
+
+      described_class.call(name: "Widget", fields: %w[columns], server_context: server_context)
+
+      expect(worker_manager).to have_received(:model).with(name: "Widget", fields: %w[columns])
+      expect(described_class.input_schema.to_h.dig(:properties, :fields, :items, :enum))
+        .to eq(%w[columns associations validators enums])
+      expect(described_class.description).to include("fields")
+      expect(described_class.description).to include("counts")
     end
 
     it "returns an error envelope when the worker manager raises" do
