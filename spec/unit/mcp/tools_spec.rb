@@ -68,7 +68,7 @@ RSpec.describe "Coatepec MCP tools" do
       [described_class, Coatepec::MCP::TestRunTool].each do |tool|
         expect(tool.description).to include("RSpec vocabulary")
         expect(tool.description).to include("failure_count")
-        expect(tool.description).to include("pending")
+        expect(tool.description).to include("a skip is pending")
       end
     end
   end

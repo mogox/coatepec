@@ -134,6 +134,19 @@ RSpec.describe Coatepec::Introspection::Routes do
                         app: double(engine?: true, rack_app: engine))])
   end
 
+  # Two engine routes, so a query that matches only one shows engines_excluded is query-scoped, not a total.
+  def app_and_two_engine_routes
+    engine = engine_class("WidgetAdmin::Engine", [
+                            FakeRoute.new("audits", "GET", "/audits(.:format)",
+                                          { controller: "widget_admin/audits", action: "index" }),
+                            FakeRoute.new("settings", "GET", "/settings(.:format)",
+                                          { controller: "widget_admin/settings", action: "show" })
+                          ])
+    stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" }),
+                 double(name: "widget_admin", verb: "", path: double(spec: "/widget_admin"), defaults: {},
+                        app: double(engine?: true, rack_app: engine))])
+  end
+
   it "withholds engine routes by default and reports how many" do
     app_and_engine_routes
 
@@ -165,6 +178,16 @@ RSpec.describe Coatepec::Introspection::Routes do
     expect(result[:engines_excluded]).to eq(1)
   end
 
+  it "counts withheld routes against the query, not the whole engine" do
+    app_and_two_engine_routes
+
+    result = described_class.new(query: "audit").call
+
+    expect(result[:engines_excluded]).to eq(1)
+    expect(described_class.new(engines: "include").call[:engines_excluded]).to eq(0)
+    expect(described_class.new.call[:engines_excluded]).to eq(2)
+  end
+
   it "returns application routes only, mount route included, when engines is exclude" do
     app_and_engine_routes
 
@@ -186,7 +209,7 @@ RSpec.describe Coatepec::Introspection::Routes do
   end
 
   # The query runs first so matched/next_offset describe the kept page and engines_excluded this query's omissions.
-  it "applies the engine filter before the query match and the page" do
+  it "applies the engine filter after the query match and before the page" do
     app_and_engine_routes
 
     result = described_class.new(query: "widget", engines: "exclude", limit: 1).call

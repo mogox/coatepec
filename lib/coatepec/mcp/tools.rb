@@ -20,12 +20,16 @@ module Coatepec
         additionalProperties: false
       }.freeze
 
+      # Both tool names share this clause, so the wording cannot drift between them.
+      RSPEC_VOCABULARY =
+        "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
+        "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
+        "stdout) and a skip is pending"
+
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
-                  "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
-                  "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
-                  "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
-                  "stdout) and a skip is pending" \
+                  "against a warm, isolated Rails test worker; the framework is chosen from the selector " \
+                  "paths#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -61,10 +65,8 @@ module Coatepec
     class TestRunTool < SpecRunTool
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
-                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
-                  "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
-                  "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
-                  "stdout) and a skip is pending" \
+                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either " \
+                  "name#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -181,8 +183,9 @@ module Coatepec
     class RoutesTool < ::MCP::Tool
       tool_name "rails_routes"
       description "Return a bounded, filterable list of the Rails app's routes, application routes only by " \
-                  "default: mounted-engine routes (admin scaffolding such as Avo) are withheld and the response's " \
-                  "engines_excluded says how many routes matching the query were held back; pass " \
+                  "default: mounted-engine routes (for example admin scaffolding) are withheld and the response's " \
+                  "engines_excluded says how many routes matching the query the engines filter held back " \
+                  "(application routes, under \"only\"); pass " \
                   "engines: \"include\" to list both or \"only\" for engine routes alone. Engine routes are " \
                   "expanded one level deep, carry the mount point in their path, and name their engine in the " \
                   "engine field (null for an application route; query also matches that field); returns up to " \
