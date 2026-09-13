@@ -9,6 +9,7 @@ module Coatepec
     class Model
       NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
       MAX_ITEMS = 200
+      MAX_OPTION_VALUES = 20
       EMPTY_TABLE_METADATA = { table_name: nil, primary_key: nil, columns: [] }.freeze
 
       def initialize(name)
@@ -166,7 +167,7 @@ module Coatepec
           {
             name: validator.class.name,
             attributes: validator.attributes.map(&:to_s),
-            options: SafeOptions.call(validator.options)
+            options: BoundedOptions.call(SafeOptions.call(validator.options), MAX_OPTION_VALUES)
           }
         end
       end

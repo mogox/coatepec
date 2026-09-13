@@ -258,5 +258,27 @@ RSpec.describe Coatepec::Introspection::Model do
 
       expect(entries.map { |v| v[:attributes] }).to eq([["slug"], ["name"]])
     end
+
+    it "cuts an array option past MAX_OPTION_VALUES to its head and says so with count and truncated keys" do
+      codes = ("AA".."ZZ").first(described_class::MAX_OPTION_VALUES + 30)
+      klass = double(validators: [validator([:country_code], { in: codes, allow_nil: true })])
+
+      options = model.send(:validators_for, klass).first[:options]
+
+      expect(options.keys).to eq(%w[in in_count in_truncated allow_nil])
+      expect(options["in"]).to eq(codes.first(described_class::MAX_OPTION_VALUES))
+      expect(options["in_count"]).to eq(described_class::MAX_OPTION_VALUES + 30)
+      expect(options["in_truncated"]).to be(true)
+    end
+
+    it "leaves an array option of MAX_OPTION_VALUES or fewer entries alone, with no sibling keys" do
+      klass = double(validators: [validator([:status], { in: %i[draft published] }),
+                                  validator([:code], { in: (1..described_class::MAX_OPTION_VALUES).to_a })])
+
+      entries = model.send(:validators_for, klass)
+
+      expect(entries.first[:options]).to eq("in" => %w[draft published])
+      expect(entries.last[:options].keys).to eq(["in"])
+    end
   end
 end

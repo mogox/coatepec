@@ -76,6 +76,11 @@
   as one -- and `only` the mounted engines' routes. The filter applies before
   `query`, so `matched` and `next_offset` describe the filtered set. On an app
   with a mounted admin engine a typical resource query shrinks by about 60%.
+- `rails_model` cuts an array-valued validator option longer than 20 entries
+  to its first 20 and adds `<option>_count` (the full length) and
+  `<option>_truncated: true` beside it -- a 249-code `inclusion` list no
+  longer costs 1.4 KB per model. Shorter lists are unchanged and carry no
+  sibling keys.
 
 ## 0.7.0
 
