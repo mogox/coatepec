@@ -11,7 +11,7 @@ RSpec.describe "Coatepec MCP tools" do
     it "returns an ok envelope with the runner's data" do
       allow(worker_manager).to receive(:run_spec)
         .with(paths: ["spec/x_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false, include_stdout: true)
+              include_passing: false, include_stdout: "failures")
         .and_return(status: "passed")
 
       response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
@@ -46,18 +46,19 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.input_schema.to_h.dig(:properties, :include_passing)).to eq(type: "boolean")
     end
 
-    it "forwards include_stdout to the worker manager and defaults it to true" do
+    it "forwards include_stdout to the worker manager and defaults it to failures" do
       allow(worker_manager).to receive(:run_spec).and_return(status: "passed", examples: [])
 
       described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
-      described_class.call(paths: ["spec/x_spec.rb"], include_stdout: false, server_context: server_context)
+      described_class.call(paths: ["spec/x_spec.rb"], include_stdout: "never", server_context: server_context)
 
-      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: true)).ordered
-      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: false)).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: "failures")).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: "never")).ordered
     end
 
-    it "declares include_stdout as a boolean input and documents it" do
-      expect(described_class.input_schema.to_h.dig(:properties, :include_stdout)).to eq(type: "boolean")
+    it "declares include_stdout as an enum input and documents it" do
+      expect(described_class.input_schema.to_h.dig(:properties, :include_stdout))
+        .to eq(type: "string", enum: %w[failures always never])
       expect(described_class.description).to include("include_stdout")
       expect(Coatepec::MCP::TestRunTool.description).to include("include_stdout")
     end
@@ -263,7 +264,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       allow(worker_manager).to receive(:run_spec)
         .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false, include_stdout: true)
+              include_passing: false, include_stdout: "failures")
         .and_return(status: "passed")
       response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
 
@@ -300,6 +301,13 @@ RSpec.describe "Coatepec MCP tools" do
     it "rejects unknown arguments to rails_spec_run" do
       expect { Coatepec::MCP::SpecRunTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"], "oops" => 1) }
         .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects a boolean include_stdout on rails_spec_run" do
+      expect do
+        Coatepec::MCP::SpecRunTool.input_schema
+                                  .validate_arguments("paths" => ["spec/x_spec.rb"], "include_stdout" => false)
+      end.to raise_error(::MCP::Tool::InputSchema::ValidationError)
     end
 
     it "rejects unknown arguments to rails_runtime_status" do

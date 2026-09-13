@@ -24,7 +24,7 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
   end
 
   it "runs a whole Minitest file and reports per-test results in the RSpec result shape" do
-    result = run_runner('paths: ["test/models/passing_test.rb"]')
+    result = run_runner('paths: ["test/models/passing_test.rb"], include_stdout: "always"')
 
     expect(result["status"]).to eq("passed"), result["stderr"]
     expect(result["exit_code"]).to eq(0)
@@ -109,7 +109,7 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
   end
 
   it "still runs RSpec selectors unchanged from the same worker" do
-    result = run_runner('paths: ["spec/passing_spec.rb"]')
+    result = run_runner('paths: ["spec/passing_spec.rb"], include_stdout: "always"')
 
     expect(result["status"]).to eq("passed")
     expect(result["stdout"]).to include("1 example, 0 failures")

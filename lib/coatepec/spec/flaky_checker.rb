@@ -48,7 +48,7 @@ module Coatepec
         # stdout is never read from a round, so it is not captured into the result.
         result = @runner.run(
           paths: paths, example: example, seed: seed, fail_fast: false,
-          timeout_seconds: timeout_seconds, include_passing: true, include_stdout: false
+          timeout_seconds: timeout_seconds, include_passing: true, include_stdout: "never"
         )
         { seed: seed, status: result[:status], examples: result[:examples] }
       end

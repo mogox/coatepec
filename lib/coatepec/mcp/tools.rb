@@ -14,7 +14,7 @@ module Coatepec
           fail_fast: { type: "boolean" },
           timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
           include_passing: { type: "boolean" },
-          include_stdout: { type: "boolean" }
+          include_stdout: { type: "string", enum: %w[failures always never] }
         },
         required: ["paths"],
         additionalProperties: false
@@ -32,13 +32,13 @@ module Coatepec
                   "paths#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
+                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-                 include_passing: false, include_stdout: true)
+                 include_passing: false, include_stdout: "failures")
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
@@ -62,7 +62,7 @@ module Coatepec
                   "name#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
+                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
     end

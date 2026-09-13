@@ -20,7 +20,8 @@ module Coatepec
       dispatch("status", {}, timeout: 30)
     end
 
-    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:, include_passing: false, include_stdout: true)
+    def run_spec(paths:, example:, seed:, fail_fast:, timeout_seconds:, include_passing: false,
+                 include_stdout: "failures")
       dispatch(
         "spec_run",
         { paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,

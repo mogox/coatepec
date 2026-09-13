@@ -7,17 +7,19 @@ module Coatepec
     # Turns a finished test child's exit status, captured output (each capped
     # at MAX_OUTPUT_BYTES) and the framework's JSON summary into the flat
     # result hash rails_spec_run returns. Passing examples are omitted unless
-    # include_passing; stdout is nulled when include_stdout is false, and
-    # otherwise its repeated failure blocks are collapsed by FailureCollapser.
+    # include_passing; stdout is kept for failing runs unless include_stdout
+    # says always or never, and its repeated failure blocks are collapsed by FailureCollapser.
     module Result
       MAX_OUTPUT_BYTES = 256 * 1024
       MAX_EXAMPLES = 500
+      STDOUT_MODES = %w[failures always never].freeze
 
       module_function
 
-      def build(pid:, status:, out_r:, err_r:, json_path:, include_passing: false, include_stdout: true)
+      def build(pid:, status:, out_r:, err_r:, json_path:, include_passing: false, include_stdout: "failures")
+        validate_stdout_mode!(include_stdout)
         captured = read_bounded(out_r)
-        stdout_result = include_stdout ? collapse_failures(captured) : captured.merge(text: nil)
+        stdout_result = keep_stdout?(include_stdout, status) ? collapse_failures(captured) : captured.merge(text: nil)
         stderr_result = read_bounded(err_r)
         summary = read_summary(json_path)
 
@@ -25,6 +27,23 @@ module Coatepec
           summary: summary && summary_fields(summary),
           examples: selected_examples(summary, include_passing).map { |e| example_fields(e) }
         )
+      end
+
+      # A green run's stdout is progress dots and a summary line the payload already carries as counts.
+      def keep_stdout?(mode, status)
+        mode == "always" || (mode == "failures" && !passed?(status))
+      end
+
+      def passed?(status)
+        status.exited? && status.exitstatus.zero?
+      end
+
+      # The MCP schema enforces the enum; this guards the worker command against any other caller.
+      def validate_stdout_mode!(mode)
+        return if STDOUT_MODES.include?(mode)
+
+        raise Coatepec::Error.new(:invalid_include_stdout,
+                                  "include_stdout must be one of #{STDOUT_MODES.join(", ")}, got #{mode.inspect}")
       end
 
       # Repeated failure text is the bulk of a failing run's stdout; examples[] already names every failing test.
@@ -41,7 +60,7 @@ module Coatepec
 
       def base(pid, status, stdout_result, stderr_result)
         {
-          status: status.exited? && status.exitstatus.zero? ? "passed" : "failed",
+          status: passed?(status) ? "passed" : "failed",
           exit_code: status.exitstatus,
           **process_fields(pid, status),
           stdout: stdout_result[:text],
