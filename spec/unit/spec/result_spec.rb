@@ -38,6 +38,16 @@ RSpec.describe Coatepec::Spec::Result do
     [out_r, err_r].compact.each(&:close)
   end
 
+  def build_with_stdout(text)
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    out_w.write(text)
+    [out_w, err_w].each(&:close)
+    described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r, json_path: summary_file([]))
+  ensure
+    [out_r, err_r].compact.each(&:close)
+  end
+
   it "omits passing examples by default, keeping failed and pending ones" do
     result = build([example("a", "passed"), example("b", "failed"), example("c", "pending")])
 
@@ -77,5 +87,17 @@ RSpec.describe Coatepec::Spec::Result do
     result = build([example("c", "pending")], pending_count: 1)
 
     expect(result[:summary]).to include(example_count: 1, failure_count: 0, pending_count: 1)
+  end
+
+  it "collapses repeated failure blocks in stdout" do
+    block = "Error:\nT#test_%s:\nRuntimeError: boom\n    test/t_test.rb:%d:in 'x'\n\n" \
+            "bin/rails test test/t_test.rb:%d\n\n"
+    text = "# Running:\n\nEE\n\n#{format(block, "a", 3, 2)}#{format(block, "b", 7, 6)}2 runs, 2 errors\n"
+
+    result = build_with_stdout(text)
+
+    expect(result[:stdout].scan("RuntimeError: boom").size).to eq(1)
+    expect(result[:stdout]).to include("1 more test failed with this same error: T#test_b\n")
+    expect(result[:stdout_truncated]).to be(false)
   end
 end

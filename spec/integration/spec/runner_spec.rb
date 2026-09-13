@@ -79,6 +79,22 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     expect(result["summary"]["failure_count"]).to eq(1)
   end
 
+  it "collapses examples that fail with the same error into one block plus a roll-up line" do
+    stdout, stderr, status = run_in_worker(<<~RUBY)
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/repeated_failure_spec.rb"])
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+    rollup = result["stdout"][/2 more tests failed with this same error: .*/]
+
+    expect(result["summary"]["failure_count"]).to eq(3)
+    expect(result["stdout"].scan("RuntimeError:\n").size).to eq(1)
+    expect(rollup).to match(/: repeated failure fixture raises \w+, repeated failure fixture raises \w+\z/)
+    expect(result["stdout"]).to include("3 examples, 3 failures")
+  end
+
   it "terminates a run that exceeds timeout_seconds" do
     stdout, stderr, status = run_in_worker(<<~RUBY)
       result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/slow_spec.rb"], timeout_seconds: 1)

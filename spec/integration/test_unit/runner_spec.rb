@@ -97,6 +97,17 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
     expect(JSON.parse(stdout.lines.last)["code"]).to eq("mixed_test_frameworks")
   end
 
+  it "collapses tests that fail with the same error into one block plus a roll-up line" do
+    result = run_runner('paths: ["test/failures/repeated_failure_test.rb"]')
+    rollup = result["stdout"][/2 more tests failed with this same error: .*/]
+
+    expect(result["status"]).to eq("failed")
+    expect(result["summary"]["failure_count"]).to eq(3)
+    expect(result["examples"].size).to eq(3)
+    expect(result["stdout"].scan("RuntimeError: the same boom").size).to eq(1)
+    expect(rollup).to match(/: RepeatedFailureTest#test_raises_\w+, RepeatedFailureTest#test_raises_\w+\z/)
+  end
+
   it "still runs RSpec selectors unchanged from the same worker" do
     result = run_runner('paths: ["spec/passing_spec.rb"]')
 

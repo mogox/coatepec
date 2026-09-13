@@ -61,6 +61,12 @@
 - `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
   roughly doubled route counts) and returns `next_offset` for the follow-up
   call, `null` on the last page.
+- `rails_spec_run`/`rails_test_run`: when several tests fail with the same
+  error text (a broken layout erroring every controller test, say), `stdout`
+  keeps the first failure block and replaces each repeat with one roll-up line
+  naming the other tests -- a 5-error controller run drops from ~4,850 B to
+  roughly a third of that. Backtrace frames and RSpec's `Failure/Error:`
+  source line are ignored when deciding that two blocks match.
 
 ## 0.7.0
 
