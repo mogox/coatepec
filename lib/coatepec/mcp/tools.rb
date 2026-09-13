@@ -20,9 +20,16 @@ module Coatepec
         additionalProperties: false
       }.freeze
 
+      # Both tool names share this clause, so the wording cannot drift between them.
+      RSPEC_VOCABULARY =
+        "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
+        "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
+        "stdout) and a skip is pending"
+
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
-                  "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
+                  "against a warm, isolated Rails test worker; the framework is chosen from the selector " \
+                  "paths#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -58,7 +65,8 @@ module Coatepec
     class TestRunTool < SpecRunTool
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
-                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
+                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either " \
+                  "name#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
                   "; pass include_stdout: false to drop stdout when summary and examples are enough"
@@ -174,13 +182,15 @@ module Coatepec
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool
       tool_name "rails_routes"
-      description "Return a bounded, filterable list of the Rails app's routes; engines: \"exclude\" returns " \
-                  "application routes only (the cheapest answer to \"what is the URL for X\"), \"only\" returns " \
-                  "mounted-engine routes only, and the default \"include\" lists both. Engine routes are expanded " \
-                  "one level deep, carry the mount point in their path, and name their engine in the engine " \
-                  "field (null for an application route; query also matches that field); returns up to limit " \
-                  "items (default 100) with next_offset -- the offset to pass back for the next page, null on " \
-                  "the last one"
+      description "Return a bounded, filterable list of the Rails app's routes, application routes only by " \
+                  "default: mounted-engine routes (for example admin scaffolding) are withheld and the response's " \
+                  "engines_excluded says how many routes matching the query the engines filter held back " \
+                  "(application routes, under \"only\"); pass " \
+                  "engines: \"include\" to list both or \"only\" for engine routes alone. Engine routes are " \
+                  "expanded one level deep, carry the mount point in their path, and name their engine in the " \
+                  "engine field (null for an application route; query also matches that field); returns up to " \
+                  "limit items (default 100) with next_offset -- the offset to pass back for the next page, " \
+                  "null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
@@ -194,7 +204,7 @@ module Coatepec
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 100, offset: 0, engines: "include")
+        def call(server_context:, query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
           Response.ok(data: data, meta: meta_for(server_context, started_at))
@@ -216,7 +226,10 @@ module Coatepec
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
       description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data"
+                  "without row data; validators are de-duplicated by class, attributes and options, so the list " \
+                  "holds distinct validators and can be shorter than klass.validators; an array-valued validator " \
+                  "option longer than 20 entries keeps its first 20 with <option>_count and <option>_truncated " \
+                  "beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

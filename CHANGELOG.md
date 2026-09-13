@@ -13,18 +13,19 @@
   example.
 - `examples[].description` (and `flaky_examples[].description`) is omitted
   when it would only repeat `id`, which is always the case for Minitest.
-- `rails_routes` and `rails_controller` now include the routes of engines
-  mounted in the application, expanded one level deep (an engine mounted
-  inside another engine stays an opaque mount route, the same boundary
-  `bin/rails routes` draws). Paths carry the mount point, so
-  `/widget_admin/audits(.:format)` is what both tools report, and a
+- `rails_routes` (with `engines: "include"`) and `rails_controller` now
+  include the routes of engines mounted in the application, expanded one
+  level deep (an engine mounted inside another engine stays an opaque mount
+  route, the same boundary `bin/rails routes` draws). Paths carry the mount
+  point, so `/widget_admin/audits(.:format)` is what both tools report, and a
   controller living inside an engine no longer has all of its actions listed
   under `unroutable_actions`.
 - `rails_routes` items and `rails_controller`'s `actions[].routes` entries
   gain an `engine` field: `null` for an application route, the engine's class
   name otherwise. `rails_routes`' `query` matches against it like every other
-  column, so `query: "Avo::Engine"` returns exactly that engine's routes.
-  Application routes are listed before engine routes.
+  column, so `query: "Avo::Engine"` with `engines: "include"` or `"only"`
+  returns exactly that engine's routes. Application routes are listed before
+  engine routes.
 - An engine route's `name` (`route_name` in `rails_controller`) is relative
   to its engine: it is reached through the mount's helper,
   `<mount name>.<name>_path`, where the mount name is the `name` of the mount
@@ -59,8 +60,8 @@
   validation used to appear twice); the 200-item cap now counts distinct
   validators.
 - `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
-  roughly doubled route counts) and returns `next_offset` for the follow-up
-  call, `null` on the last page.
+  roughly doubled route counts when engines are included) and returns
+  `next_offset` for the follow-up call, `null` on the last page.
 - `rails_spec_run`/`rails_test_run`: when several tests fail with the same
   error text (a broken layout erroring every controller test, say), `stdout`
   keeps the first failure block and replaces each repeat with one roll-up line
@@ -71,11 +72,17 @@
   `include_stdout: false` returns `stdout: null` -- the key stays so the result
   shape is uniform -- for callers that only read `summary` and `examples`.
   `stderr` is always returned.
-- `rails_routes` gains `engines` (`include`, the default; `exclude`; `only`).
-  `exclude` returns application routes only -- an engine's mount route counts
-  as one -- and `only` the mounted engines' routes. The filter applies before
-  `query`, so `matched` and `next_offset` describe the filtered set. On an app
-  with a mounted admin engine a typical resource query shrinks by about 60%.
+- `rails_routes` returns application routes only by default and gains
+  `engines` to change that: `include` lists the routes of mounted engines
+  too -- the routes 0.8.0 added by expanding engines -- and `only` lists just
+  those; the default matches pre-0.8.0 output (application routes, the mount
+  route included). Every response carries `engines` (the filter applied) and
+  `engines_excluded` (how many routes matching `query` were withheld), so the
+  omission is stated, never silent. The filter applies after `query` and
+  before paging, so `matched` and `next_offset` describe the kept set; an
+  engine's mount route counts as an application route. Measured on an app
+  with a mounted admin engine, six typical route queries cost 57% less
+  context with engine routes withheld.
 - `rails_model` cuts an array-valued validator option longer than 20 entries
   to its first 20 and adds `<option>_count` (the full length) and
   `<option>_truncated: true` beside it -- a 249-code `inclusion` list no

@@ -4,33 +4,40 @@ require_relative "route_entries"
 
 module Coatepec
   module Introspection
-    # Returns a bounded, filterable list of the target app's routes, mounted-engine routes included
-    # unless engines: "exclude", for the rails_routes MCP tool.
-    # Reads route tables only -- no console, no dispatch.
+    # Returns a bounded, filterable list of the target app's routes for the rails_routes MCP tool: application
+    # routes by default, mounted-engine routes on request. Reads route tables only -- no console, no dispatch.
     class Routes
       MAX_LIMIT = 200
       DEFAULT_LIMIT = 100
       ENGINE_FILTERS = %w[include exclude only].freeze
+      # Engine CRUD scaffolding was two thirds of a typical match; the payload states what the default withheld.
+      DEFAULT_ENGINES = "exclude"
 
-      def initialize(query: nil, limit: DEFAULT_LIMIT, offset: 0, engines: "include")
+      def initialize(query: nil, limit: DEFAULT_LIMIT, offset: 0, engines: DEFAULT_ENGINES)
         @query = query
         @limit = [limit || DEFAULT_LIMIT, MAX_LIMIT].min
         @offset = offset || 0
-        @engines = validate_engines!(engines || "include")
+        @engines = validate_engines!(engines || DEFAULT_ENGINES)
       end
 
       def call
-        matched = filtered_items
+        matched, excluded = partitioned_items
+        page(matched, excluded)
+      end
+
+      private
+
+      def page(matched, excluded)
         {
           items: matched[@offset, @limit] || [],
           matched: matched.size,
           limit: @limit,
           offset: @offset,
-          next_offset: next_offset_for(matched.size)
+          next_offset: next_offset_for(matched.size),
+          engines: @engines,
+          engines_excluded: excluded.size
         }
       end
-
-      private
 
       # The MCP schema already enforces the enum; this guards the worker command against any other caller.
       def validate_engines!(value)
@@ -47,9 +54,13 @@ module Coatepec
         candidate > @offset && candidate < matched_count ? candidate : nil
       end
 
-      # Engine filtering runs before the query so matched and next_offset describe what is returned.
-      def filtered_items
-        items = all_items.select { |item| engine_selected?(item) }
+      # Query first, then the engine filter, so engines_excluded counts routes this exact query would have shown.
+      def partitioned_items
+        query_matches.partition { |item| engine_selected?(item) }
+      end
+
+      def query_matches
+        items = all_items
         return items unless @query
 
         query_downcased = @query.downcase

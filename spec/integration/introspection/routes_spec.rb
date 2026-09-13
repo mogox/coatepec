@@ -27,7 +27,7 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
       $LOAD_PATH.unshift(#{lib_path.inspect})
       require "coatepec"
       Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
-      result = Coatepec::Introspection::Routes.new(query: "audits").call
+      result = Coatepec::Introspection::Routes.new(query: "audits", engines: "include").call
       puts JSON.generate(result)
     RUBY
 
@@ -49,8 +49,9 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
       $LOAD_PATH.unshift(#{lib_path.inspect})
       require "coatepec"
       Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
-      puts JSON.generate(Coatepec::Introspection::Routes.new(query: "audits", limit: 1).call)
-      puts JSON.generate(Coatepec::Introspection::Routes.new(query: "audits", limit: 1, offset: 1).call)
+      args = { query: "audits", limit: 1, engines: "include" }
+      puts JSON.generate(Coatepec::Introspection::Routes.new(**args).call)
+      puts JSON.generate(Coatepec::Introspection::Routes.new(**args, offset: 1).call)
     RUBY
 
     expect(status).to be_success, stderr
@@ -67,7 +68,7 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
       $LOAD_PATH.unshift(#{lib_path.inspect})
       require "coatepec"
       Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
-      result = Coatepec::Introspection::Routes.new(limit: 200).call
+      result = Coatepec::Introspection::Routes.new(engines: "include", limit: 200).call
       puts JSON.generate(result)
     RUBY
 
@@ -101,5 +102,24 @@ RSpec.describe Coatepec::Introspection::Routes, type: :integration do
     expect(only["items"].map { |r| r["engine"] }).to all(eq("WidgetAdmin::Engine"))
     expect(only["items"]).not_to be_empty
     expect(excluded["matched"] + only["matched"]).to eq(excluded["items"].size + only["items"].size)
+    expect(excluded["engines_excluded"]).to eq(only["items"].size)
+    expect(only["engines_excluded"]).to eq(excluded["items"].size)
+  end
+
+  it "withholds the engine's routes by default and reports the count in the payload" do
+    lib_path = File.expand_path("../../../lib", __dir__)
+    stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+      $LOAD_PATH.unshift(#{lib_path.inspect})
+      require "coatepec"
+      Coatepec::Worker::RailsRuntime.new(#{FIXTURE_APP_ROOT.inspect}).boot!
+      puts JSON.generate(Coatepec::Introspection::Routes.new(query: "audits").call)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["items"]).to eq([])
+    expect(result["engines"]).to eq("exclude")
+    expect(result["engines_excluded"]).to be > 0
   end
 end

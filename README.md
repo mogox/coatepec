@@ -134,8 +134,8 @@ a no-op.
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`include`/`exclude`/`only`, default `include`) | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). `engines: "exclude"` returns application routes only (the engine's mount route counts as one), `"only"` the engine routes; the filter applies before `query`, so `matched`/`next_offset` describe the filtered set. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
-| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) | Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
 | `rails_test_flaky_check` | same as `rails_spec_flaky_check` | Alias of `rails_spec_flaky_check` |
@@ -144,23 +144,24 @@ a no-op.
 
 `rails_routes`:
 
-- "What are all the routes in this app?" -- `rails_routes()`
+- "What are all the routes in this app?" -- `rails_routes()`, the
+  application's own; add `engines: "include"` for the mounted engines' too.
 - "What's the URL for widgets?" -- `rails_routes(query: "widget")`. `query` is a
   case-insensitive substring match across name, verb, path, controller, *and*
   action -- not just the path -- so a resource name alone typically returns
   every route for that resource (index/create/new/...); narrow further with
-  something like `query: "new_widget"` to hit one route by name.
-- "What's the URL for widgets, ignoring the admin engine?" --
-  `rails_routes(query: "widget", engines: "exclude")`. In an app with a
-  mounted admin engine the engine's CRUD scaffolding is often two thirds of
-  every match; `engines: "exclude"` leaves the application's own routes (the
-  mount route itself included), `engines: "only"` the engine's.
+  something like `query: "new_widget"` to hit one route by name. The call
+  already leaves out the admin engine's scaffolding, which is often two thirds
+  of every match; the response's `engines_excluded` says how many engine routes
+  it held back. Pass `engines: "include"` to see them too, or
+  `engines: "only"` for just the engine's.
 - "Which routes accept POST?" -- `rails_routes(query: "POST")`, the same
   substring match applied to the verb column.
-- "Which routes does the Avo engine add?" -- `rails_routes(query: "Avo::Engine")`
-  -- the substring match covers the `engine` column too, so an engine's class
-  name returns exactly the routes mounted from it. Application routes always
-  sort before engine routes, so an unfiltered listing reads the way
+- "Which routes does the Avo engine add?" --
+  `rails_routes(query: "Avo::Engine", engines: "only")` -- the substring match
+  covers the `engine` column too, so an engine's class name returns exactly the
+  routes mounted from it. Application routes always sort before engine routes,
+  so an unfiltered listing (with `engines: "include"`) reads the way
   `bin/rails routes` does.
 - An engine route's `name` is relative to its engine, not a top-level url
   helper: `{"name": "audits", "path": "/widget_admin/audits(.:format)",
@@ -169,7 +170,8 @@ a no-op.
   name is the `name` of the mount route itself -- and `audits_path` alone
   does not exist on the application.
 - An engine mounted at two paths is listed under both mount points, once per
-  prefixed path, since each of those paths is a real, reachable URL.
+  prefixed path, whenever engine routes are in scope, since each of those
+  paths is a real, reachable URL.
   `bin/rails routes` keys engines by endpoint and so lists such an engine
   only once.
 - Paging: when `next_offset` is not `null`, call again with
@@ -299,7 +301,9 @@ suspect.
   (`example: "reaches the"` matches `test_reaches_the_database`), passed to
   Minitest as an escaped regex.
 - Results use RSpec's vocabulary so the shape is identical: a Minitest skip
-  is `"pending"`, an error is `"failed"`; `id` is `ClassName#test_method`.
+  is `"pending"`, an error is `"failed"` and counts toward
+  `summary.failure_count` -- which is why that number can exceed the
+  `failures` Minitest prints in `stdout`; `id` is `ClassName#test_method`.
 - One call may not mix `spec/` and `test/` paths (`mixed_test_frameworks`).
 - Rails' parallel testing is disabled in the child (`PARALLEL_WORKERS=1`), so
   a large directory selection runs serially under the one timeout budget

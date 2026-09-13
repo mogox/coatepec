@@ -41,7 +41,7 @@ module Coatepec
       )
     end
 
-    def routes(query: nil, limit: 100, offset: 0, engines: "include")
+    def routes(query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
       dispatch("routes", { query: query, limit: limit, offset: offset, engines: engines }, timeout: 30)
     end
 

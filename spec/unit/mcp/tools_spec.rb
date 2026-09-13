@@ -61,6 +61,16 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("include_stdout")
       expect(Coatepec::MCP::TestRunTool.description).to include("include_stdout")
     end
+
+    # Three benchmark sessions read failure_count against Minitest's own "0 failures, 5 errors" line and
+    # suspected a bug; the description is the only place an MCP client can learn the vocabulary.
+    it "explains that results use RSpec vocabulary on both tools" do
+      [described_class, Coatepec::MCP::TestRunTool].each do |tool|
+        expect(tool.description).to include("RSpec vocabulary")
+        expect(tool.description).to include("failure_count")
+        expect(tool.description).to include("a skip is pending")
+      end
+    end
   end
 
   describe Coatepec::MCP::RuntimeStatusTool do
@@ -108,27 +118,29 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("next_offset")
     end
 
-    it "leads its description with the engines filter and declares it as an enum" do
+    it "says engine routes are withheld by default, names the count field and declares the enum" do
       expect(described_class.description)
-        .to start_with("Return a bounded, filterable list of the Rails app's routes; engines: \"exclude\"")
+        .to start_with("Return a bounded, filterable list of the Rails app's routes, application routes only by " \
+                       "default")
+      expect(described_class.description).to include("engines_excluded")
       expect(described_class.input_schema.to_h.dig(:properties, :engines))
         .to eq(type: "string", enum: %w[include exclude only])
     end
 
-    it "forwards engines to the worker manager and defaults it to include" do
+    it "forwards engines to the worker manager and defaults it to exclude" do
       allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
                                                            next_offset: nil)
 
       described_class.call(server_context: server_context)
-      described_class.call(engines: "exclude", server_context: server_context)
+      described_class.call(engines: "include", server_context: server_context)
 
-      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "include")).ordered
       expect(worker_manager).to have_received(:routes).with(hash_including(engines: "exclude")).ordered
+      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "include")).ordered
     end
 
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
-        .with(query: "widgets", limit: 50, offset: 0, engines: "include")
+        .with(query: "widgets", limit: 50, offset: 0, engines: "exclude")
         .and_return(items: [], matched: 0, limit: 50, offset: 0)
 
       response = described_class.call(query: "widgets", limit: 50, offset: 0, server_context: server_context)
@@ -144,7 +156,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       described_class.call(server_context: server_context)
 
-      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0, engines: "include")
+      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0, engines: "exclude")
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -159,6 +171,11 @@ RSpec.describe "Coatepec MCP tools" do
   end
 
   describe Coatepec::MCP::ModelTool do
+    it "explains validator de-duplication and option truncation in its description" do
+      expect(described_class.description).to include("distinct validators")
+      expect(described_class.description).to include("_truncated")
+    end
+
     it "returns an ok envelope with the model data" do
       allow(worker_manager).to receive(:model).with(name: "Widget").and_return(name: "Widget", columns: [])
 
