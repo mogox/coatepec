@@ -5,27 +5,26 @@
 - Tool responses are now compact JSON rather than pretty-printed (22-32%
   smaller on measured payloads); set `COATEPEC_PRETTY=1` on the server
   process to restore indentation.
-- `rails_spec_run` and `rails_test_run` now omit passing examples from
-  `examples` by default -- a 49-test green run drops from ~3,700 tokens to
-  ~160 -- and `summary` gains `pending_count`. Pass the new
-  `include_passing: true` input to get the full roster back (still capped at
-  500 examples). `rails_spec_flaky_check` is unaffected: it still sees every
-  example.
+- `rails_spec_run` now omits passing examples from `examples` by default --
+  a 49-test green run drops from ~3,700 tokens to ~160 -- and `summary` gains
+  `pending_count`. Pass the new `include_passing: true` input to get the full
+  roster back (still capped at 500 examples). `rails_spec_flaky_check` is
+  unaffected: it still sees every example.
 - `examples[].description` (and `flaky_examples[].description`) is omitted
   when it would only repeat `id`, which is always the case for Minitest.
 - `rails_routes` (with `engines: "include"`) and `rails_controller` now
   include the routes of engines mounted in the application, expanded one
   level deep (an engine mounted inside another engine stays an opaque mount
   route, the same boundary `bin/rails routes` draws). Paths carry the mount
-  point, so `/widget_admin/audits(.:format)` is what both tools report, and a
+  point, so `/widget_admin/audits` is what both tools report, and a
   controller living inside an engine no longer has all of its actions listed
   under `unroutable_actions`.
-- `rails_routes` items and `rails_controller`'s `actions[].routes` entries
-  gain an `engine` field: `null` for an application route, the engine's class
-  name otherwise. `rails_routes`' `query` matches against it like every other
-  column, so `query: "Avo::Engine"` with `engines: "include"` or `"only"`
-  returns exactly that engine's routes. Application routes are listed before
-  engine routes.
+- `rails_routes` gains an `engine` column and `rails_controller`'s
+  `actions[].routes` entries an `engine` field: `null` for an application
+  route, the engine's class name otherwise. `rails_routes`' `query` matches
+  against it like every other column, so `query: "Avo::Engine"` with
+  `engines: "include"` or `"only"` returns exactly that engine's routes.
+  Application routes are listed before engine routes.
 - An engine route's `name` (`route_name` in `rails_controller`) is relative
   to its engine: it is reached through the mount's helper,
   `<mount name>.<name>_path`, where the mount name is the `name` of the mount
@@ -42,9 +41,6 @@
   `"failed"`). The framework is chosen per call from the selector paths --
   an app that has both `spec/` and `test/` works without configuration; one
   call may not mix the two (`mixed_test_frameworks`).
-- Add `rails_test_run` and `rails_test_flaky_check` as aliases of the two
-  tools above, for agents that look for a Minitest-named tool. Identical
-  schema and behaviour.
 - The Minitest child sets `PARALLEL_WORKERS=1`, so a selection above Rails'
   parallelization threshold runs serially under the call's single timeout
   instead of forking a worker tree.
@@ -59,19 +55,20 @@
   options into one entry (a concern and the model body declaring the same
   validation used to appear twice); the 200-item cap now counts distinct
   validators.
-- `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
+- `rails_routes` defaults to 100 routes per page (was 50 -- engine expansion
   roughly doubled route counts when engines are included) and returns
   `next_offset` for the follow-up call, `null` on the last page.
-- `rails_spec_run`/`rails_test_run`: when several tests fail with the same
-  error text (a broken layout erroring every controller test, say), `stdout`
-  keeps the first failure block and replaces each repeat with one roll-up line
+- `rails_spec_run`: when several tests fail with the same error text (a
+  broken layout erroring every controller test, say), `stdout` keeps the
+  first failure block and replaces each repeat with one roll-up line
   naming the other tests -- a 5-error controller run drops from ~4,850 B to
   roughly a third of that. Backtrace frames and RSpec's `Failure/Error:`
   source line are ignored when deciding that two blocks match.
-- `rails_spec_run`/`rails_test_run` gain `include_stdout` (default `true`).
-  `include_stdout: false` returns `stdout: null` -- the key stays so the result
-  shape is uniform -- for callers that only read `summary` and `examples`.
-  `stderr` is always returned.
+- `rails_spec_run` gains `include_stdout` (`failures`, the default; `always`;
+  `never`). A passing run's `stdout` is `null` by default -- its progress
+  dots and summary line only repeat `summary` -- and a failing run's is
+  returned; `always` and `never` override that either way. The key stays so
+  the result shape is uniform. `stderr` is always returned.
 - `rails_routes` returns application routes only by default and gains
   `engines` to change that: `include` lists the routes of mounted engines
   too -- the routes 0.8.0 added by expanding engines -- and `only` lists just
@@ -88,6 +85,22 @@
   `<option>_truncated: true` beside it -- a 249-code `inclusion` list no
   longer costs 1.4 KB per model. Shorter lists are unchanged and carry no
   sibling keys.
+- Every tool response's `meta` is now just `duration_ms`; `project_root` is
+  reported once by `rails_runtime_status` (beside `environment`) instead of
+  on every call.
+- `rails_spec_run` results carry `child_pid`, `signaled`, `termsig`,
+  `stopsig` and `coredump` only when the child did not exit normally (a
+  timeout kill or a crash); a normal run reports `status`, `exit_code` and
+  the output fields alongside the usual `summary` and `examples`.
+- `rails_model` always returns `counts` (the size of each of its four lists,
+  after validator de-duplication and the 200-item caps) and gains `fields`,
+  an array of `columns`/`associations`/`validators`/`enums` naming the lists
+  to return; omitted means all, `[]` means counts only.
+- `rails_routes` returns `columns` (`name`, `verb`, `path`, `controller`,
+  `action`, `engine`) and `rows` instead of one object per route -- the six
+  key names were a third of every item's bytes -- and both `rails_routes`
+  and `rails_controller` report paths without the `(.:format)` suffix Rails
+  appends to most routes.
 
 ## 0.7.0
 

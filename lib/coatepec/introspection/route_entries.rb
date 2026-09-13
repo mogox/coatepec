@@ -18,7 +18,7 @@ module Coatepec
       def call
         visible = @routes.reject { |route| internal?(route) }
 
-        visible.map { |route| Entry.new(route, route.path.spec.to_s, nil) } +
+        visible.map { |route| Entry.new(route, path_of(route), nil) } +
           visible.flat_map { |route| engine_entries(route) }
       end
 
@@ -37,13 +37,17 @@ module Coatepec
         prefix = mount_prefix(route)
         name = engine_name(engine)
         inner_routes(engine).reject { |inner| internal?(inner) }
-                            .map { |inner| Entry.new(inner, prefix + inner.path.spec.to_s, name) }
+                            .map { |inner| Entry.new(inner, prefix + path_of(inner), name) }
       end
 
-      # A `format: true` mount would carry (.:format); the inner routes bring their own. chomp only
-      # affects a mount at "/", whose junction is the one place a "//" could form.
+      # `(.:format)` is on nearly every route and says nothing a caller acts on; `bin/rails routes` shows it, we don't.
+      def path_of(route)
+        route.path.spec.to_s.sub(/\(\.:format\)\z/, "")
+      end
+
+      # chomp only affects a mount at "/", whose junction is the one place a "//" could form.
       def mount_prefix(route)
-        route.path.spec.to_s.sub(/\(\.:format\)\z/, "").chomp("/")
+        path_of(route).chomp("/")
       end
 
       # Only a ::Rails::Engine subclass is expanded or named; nothing else ever gets .name called on it.

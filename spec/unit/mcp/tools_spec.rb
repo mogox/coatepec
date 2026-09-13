@@ -11,7 +11,7 @@ RSpec.describe "Coatepec MCP tools" do
     it "returns an ok envelope with the runner's data" do
       allow(worker_manager).to receive(:run_spec)
         .with(paths: ["spec/x_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false, include_stdout: true)
+              include_passing: false, include_stdout: "failures")
         .and_return(status: "passed")
 
       response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
@@ -19,7 +19,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(false)
       expect(payload["data"]).to eq("status" => "passed")
-      expect(payload["meta"]["project_root"]).to eq("/app")
+      expect(payload["meta"].keys).to eq(["duration_ms"])
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -46,30 +46,32 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.input_schema.to_h.dig(:properties, :include_passing)).to eq(type: "boolean")
     end
 
-    it "forwards include_stdout to the worker manager and defaults it to true" do
+    it "forwards include_stdout to the worker manager and defaults it to failures" do
       allow(worker_manager).to receive(:run_spec).and_return(status: "passed", examples: [])
 
       described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
-      described_class.call(paths: ["spec/x_spec.rb"], include_stdout: false, server_context: server_context)
+      described_class.call(paths: ["spec/x_spec.rb"], include_stdout: "never", server_context: server_context)
 
-      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: true)).ordered
-      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: false)).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: "failures")).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: "never")).ordered
     end
 
-    it "declares include_stdout as a boolean input and documents it" do
-      expect(described_class.input_schema.to_h.dig(:properties, :include_stdout)).to eq(type: "boolean")
+    it "declares include_stdout as an enum input and documents it" do
+      expect(described_class.input_schema.to_h.dig(:properties, :include_stdout))
+        .to eq(type: "string", enum: %w[failures always never])
       expect(described_class.description).to include("include_stdout")
-      expect(Coatepec::MCP::TestRunTool.description).to include("include_stdout")
     end
 
     # Three benchmark sessions read failure_count against Minitest's own "0 failures, 5 errors" line and
     # suspected a bug; the description is the only place an MCP client can learn the vocabulary.
-    it "explains that results use RSpec vocabulary on both tools" do
-      [described_class, Coatepec::MCP::TestRunTool].each do |tool|
-        expect(tool.description).to include("RSpec vocabulary")
-        expect(tool.description).to include("failure_count")
-        expect(tool.description).to include("a skip is pending")
-      end
+    it "explains that results use RSpec vocabulary" do
+      expect(described_class.description).to include("RSpec vocabulary")
+      expect(described_class.description).to include("failure_count")
+      expect(described_class.description).to include("a skip is pending")
+    end
+
+    it "says there is no separate Minitest tool" do
+      expect(described_class.description).to include("no separate Minitest tool")
     end
   end
 
@@ -80,7 +82,11 @@ RSpec.describe "Coatepec MCP tools" do
       response = described_class.call(server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
-      expect(payload["data"]).to eq("environment" => "test")
+      expect(payload["data"]).to eq("environment" => "test", "project_root" => "/app")
+    end
+
+    it "documents project_root" do
+      expect(described_class.description).to include("project_root")
     end
   end
 
@@ -116,6 +122,7 @@ RSpec.describe "Coatepec MCP tools" do
 
     it "tells the client how to page through the results" do
       expect(described_class.description).to include("next_offset")
+      expect(described_class.description).to include("rows")
     end
 
     it "says engine routes are withheld by default, names the count field and declares the enum" do
@@ -128,8 +135,8 @@ RSpec.describe "Coatepec MCP tools" do
     end
 
     it "forwards engines to the worker manager and defaults it to exclude" do
-      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
-                                                           next_offset: nil)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
 
       described_class.call(server_context: server_context)
       described_class.call(engines: "include", server_context: server_context)
@@ -141,18 +148,18 @@ RSpec.describe "Coatepec MCP tools" do
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
         .with(query: "widgets", limit: 50, offset: 0, engines: "exclude")
-        .and_return(items: [], matched: 0, limit: 50, offset: 0)
+        .and_return(columns: [], rows: [], matched: 0, limit: 50, offset: 0)
 
       response = described_class.call(query: "widgets", limit: 50, offset: 0, server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
-      expect(payload["data"]).to eq("items" => [], "matched" => 0, "limit" => 50, "offset" => 0)
+      expect(payload["data"]).to eq("columns" => [], "rows" => [], "matched" => 0, "limit" => 50, "offset" => 0)
     end
 
     it "defaults limit to 100" do
-      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
-                                                           next_offset: nil)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
 
       described_class.call(server_context: server_context)
 
@@ -177,13 +184,26 @@ RSpec.describe "Coatepec MCP tools" do
     end
 
     it "returns an ok envelope with the model data" do
-      allow(worker_manager).to receive(:model).with(name: "Widget").and_return(name: "Widget", columns: [])
+      allow(worker_manager).to receive(:model)
+        .with(name: "Widget", fields: nil).and_return(name: "Widget", columns: [])
 
       response = described_class.call(name: "Widget", server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
       expect(payload["data"]).to eq("name" => "Widget", "columns" => [])
+    end
+
+    it "forwards fields to the worker manager and declares it as an enum array" do
+      allow(worker_manager).to receive(:model).and_return(name: "Widget")
+
+      described_class.call(name: "Widget", fields: %w[columns], server_context: server_context)
+
+      expect(worker_manager).to have_received(:model).with(name: "Widget", fields: %w[columns])
+      expect(described_class.input_schema.to_h.dig(:properties, :fields, :items, :enum))
+        .to eq(%w[columns associations validators enums])
+      expect(described_class.description).to include("fields")
+      expect(described_class.description).to include("counts")
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -254,45 +274,13 @@ RSpec.describe "Coatepec MCP tools" do
     end
   end
 
-  describe Coatepec::MCP::TestRunTool do
-    it "is an alias of rails_spec_run with the same schema and behaviour" do
-      expect(described_class.tool_name).to eq("rails_test_run")
-      expect(described_class.description).to include("rails_spec_run")
-      expect(described_class.input_schema.to_h).to eq(Coatepec::MCP::SpecRunTool.input_schema.to_h)
-      expect(described_class.annotations.to_h).to eq(Coatepec::MCP::SpecRunTool.annotations.to_h)
-
-      allow(worker_manager).to receive(:run_spec)
-        .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false, include_stdout: true)
-        .and_return(status: "passed")
-      response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
-
-      expect(JSON.parse(response.content.first[:text])["data"]).to eq("status" => "passed")
-    end
-  end
-
-  describe Coatepec::MCP::TestFlakyCheckTool do
-    it "is an alias of rails_spec_flaky_check with the same schema and behaviour" do
-      expect(described_class.tool_name).to eq("rails_test_flaky_check")
-      expect(described_class.description).to include("rails_spec_flaky_check")
-      expect(described_class.input_schema.to_h).to eq(Coatepec::MCP::FlakyCheckTool.input_schema.to_h)
-
-      allow(worker_manager).to receive(:check_flaky)
-        .with(paths: ["test/models/x_test.rb"], example: nil, timeout_seconds: 120, runs: 5)
-        .and_return(runs: 5, rounds: [], flaky_examples: [], consistently_failing: [])
-      response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
-
-      expect(JSON.parse(response.content.first[:text])["data"]["runs"]).to eq(5)
-    end
-  end
-
   it "registers all tools on a built server" do
     project = instance_double(Coatepec::Project, root: "/app")
     server = Coatepec::MCP.build_server(project: project, worker_manager: worker_manager)
 
     expect(server.tools.keys).to contain_exactly(
-      "rails_spec_run", "rails_test_run", "rails_runtime_status", "rails_runtime_restart",
-      "rails_spec_flaky_check", "rails_test_flaky_check", "rails_routes", "rails_model", "rails_controller"
+      "rails_spec_run", "rails_runtime_status", "rails_runtime_restart",
+      "rails_spec_flaky_check", "rails_routes", "rails_model", "rails_controller"
     )
   end
 
@@ -300,6 +288,13 @@ RSpec.describe "Coatepec MCP tools" do
     it "rejects unknown arguments to rails_spec_run" do
       expect { Coatepec::MCP::SpecRunTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"], "oops" => 1) }
         .to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects a boolean include_stdout on rails_spec_run" do
+      expect do
+        Coatepec::MCP::SpecRunTool.input_schema
+                                  .validate_arguments("paths" => ["spec/x_spec.rb"], "include_stdout" => false)
+      end.to raise_error(::MCP::Tool::InputSchema::ValidationError)
     end
 
     it "rejects unknown arguments to rails_runtime_status" do

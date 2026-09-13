@@ -51,7 +51,7 @@ RSpec.describe "coatepec-worker executable", type: :integration do
   it "answers a spec_run command" do
     @pid, protocol = spawn_worker
 
-    protocol.write(id: 1, command: "spec_run", args: { paths: ["spec/passing_spec.rb"] })
+    protocol.write(id: 1, command: "spec_run", args: { paths: ["spec/passing_spec.rb"], include_stdout: "always" })
     response = protocol.read
 
     expect(response[:ok]).to be(true)
@@ -103,8 +103,9 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     response = protocol.read
 
     expect(response[:ok]).to be(true)
-    expect(response[:data][:items]).not_to be_empty
-    expect(response[:data][:items].first[:controller]).to eq("widgets")
+    expect(response[:data][:rows]).not_to be_empty
+    controller_index = response[:data][:columns].index("controller")
+    expect(response[:data][:rows].first[controller_index]).to eq("widgets")
   end
 
   it "answers a model command" do

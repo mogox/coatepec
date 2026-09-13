@@ -37,6 +37,11 @@ module Coatepec
       def generate(payload)
         ENV["COATEPEC_PRETTY"] == "1" ? JSON.pretty_generate(payload) : JSON.generate(payload)
       end
+
+      # Per-call timing is the only per-call fact; project_root and environment live on rails_runtime_status.
+      def meta(started_at)
+        { duration_ms: ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round }
+      end
     end
   end
 end

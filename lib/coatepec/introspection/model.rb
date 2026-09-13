@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "model_resolver"
+
 module Coatepec
   module Introspection
     # Returns bounded ActiveRecord schema and class metadata for a single
@@ -7,46 +9,47 @@ module Coatepec
     # reflection, no method dispatch on the resolved class beyond pure
     # introspection APIs.
     class Model
-      NAME_PATTERN = /\A[A-Z]\w*(?:::[A-Z]\w*)*\z/
+      FIELDS = %w[columns associations validators enums].freeze
       MAX_ITEMS = 200
       MAX_OPTION_VALUES = 20
       EMPTY_TABLE_METADATA = { table_name: nil, primary_key: nil, columns: [] }.freeze
 
-      def initialize(name)
+      def initialize(name, fields: nil)
         @name = name
+        @fields = validate_fields!(fields || FIELDS)
       end
 
       def call
-        validate_name!
-        klass = resolve!
-        validate_active_record!(klass)
+        klass = ModelResolver.call(@name)
         build_metadata(klass)
       end
 
       private
 
-      # An abstract class (e.g. ApplicationRecord) has no real table, so
-      # table_name/primary_key/columns all raise if called against it --
-      # report empty/nil table data instead of crashing. Validators aren't
-      # table-dependent, so those are always attempted.
+      # An abstract class (e.g. ApplicationRecord) has no real table, so table_name/primary_key/columns all raise
+      # if called against it -- report empty/nil table data instead. abstract_class? is nil (not false) for a
+      # concrete class on Rails 7.1 and false on 8.1, so normalize it for version-stable JSON. enums, like
+      # validators, are in-memory class metadata needing no connection, so they are always collected.
       def build_metadata(klass)
-        # abstract_class? is a plain attr_accessor-backed predicate that is
-        # never assigned on concrete subclasses -- on Rails 7.1 it returns
-        # nil (not false) in that case, while Rails 8.1 returns false.
-        # Normalize to a genuine Boolean so JSON output is version-stable.
         abstract = klass.abstract_class? || false
         table = abstract ? EMPTY_TABLE_METADATA : table_metadata(klass)
-        {
-          name: klass.name, table_name: table[:table_name], primary_key: table[:primary_key],
-          abstract_class: abstract, columns: table[:columns],
-          associations: abstract ? [] : associations_for(klass),
-          validators: validators_for(klass),
-          # enum declarations are pure in-memory class metadata (populated
-          # when the `enum` macro runs in the class body) -- unlike columns
-          # and associations, they need no DB connection or real table, so
-          # this is attempted unconditionally, the same way validators are.
-          enums: enums_for(klass)
-        }
+        sections = { columns: table[:columns], associations: abstract ? [] : associations_for(klass),
+                     validators: validators_for(klass), enums: enums_for(klass) }
+        { name: klass.name, table_name: table[:table_name], primary_key: table[:primary_key], abstract_class: abstract,
+          counts: sections.transform_values(&:size) }.merge(sections.slice(*(FIELDS & @fields).map(&:to_sym)))
+      end
+
+      # The MCP schema enforces the enum; this guards the worker command against any other caller.
+      def validate_fields!(fields)
+        unless fields.is_a?(Array)
+          raise Coatepec::Error.new(:invalid_model_fields, "fields must be an array, got #{fields.inspect}")
+        end
+
+        unknown = fields - FIELDS
+        return fields if unknown.empty?
+
+        raise Coatepec::Error.new(:invalid_model_fields,
+                                  "fields must be among #{FIELDS.join(", ")}, got #{unknown.inspect}")
       end
 
       # A concrete model can still name a table that isn't there: a checkout
@@ -67,23 +70,6 @@ module Coatepec
           :table_not_found,
           "#{@name}'s table (#{klass.table_name}) does not exist or could not be read"
         )
-      end
-
-      def validate_name!
-        return if @name.is_a?(String) && NAME_PATTERN.match?(@name)
-
-        raise Coatepec::Error.new(:invalid_model_name, "#{@name.inspect} is not a valid constant name")
-      end
-
-      def resolve!
-        ::ActiveSupport::Inflector.safe_constantize(@name) ||
-          raise(Coatepec::Error.new(:model_not_found, "#{@name} could not be resolved"))
-      end
-
-      def validate_active_record!(klass)
-        return if klass.is_a?(Class) && klass < ::ActiveRecord::Base
-
-        raise Coatepec::Error.new(:not_active_record_model, "#{@name} is not an ActiveRecord model")
       end
 
       def columns_for(klass)

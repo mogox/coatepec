@@ -10,6 +10,8 @@ module Coatepec
       MAX_LIMIT = 200
       DEFAULT_LIMIT = 100
       ENGINE_FILTERS = %w[include exclude only].freeze
+      COLUMNS = %w[name verb path controller action engine].freeze
+      COLUMN_KEYS = COLUMNS.map(&:to_sym).freeze
       # Engine CRUD scaffolding was two thirds of a typical match; the payload states what the default withheld.
       DEFAULT_ENGINES = "exclude"
 
@@ -27,9 +29,11 @@ module Coatepec
 
       private
 
+      # Rows instead of one hash per route: the six key names were a third of every item's bytes.
       def page(matched, excluded)
         {
-          items: matched[@offset, @limit] || [],
+          columns: COLUMNS,
+          rows: (matched[@offset, @limit] || []).map { |item| item.values_at(*COLUMN_KEYS) },
           matched: matched.size,
           limit: @limit,
           offset: @offset,

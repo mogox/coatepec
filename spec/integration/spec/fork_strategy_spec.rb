@@ -23,9 +23,9 @@ RSpec.describe Coatepec::Spec::ForkStrategy, type: :integration do
   it "does not accumulate RSpec's own \"files took to load\" time across forked runs from the same warm worker" do
     stdout, stderr, status = run_in_worker(<<~RUBY)
       strategy = Coatepec::Spec::ForkStrategy.new(#{FIXTURE_APP_ROOT.inspect})
-      first = strategy.run(["spec/passing_spec.rb"], 30)
+      first = strategy.run(["spec/passing_spec.rb"], 30, include_stdout: "always")
       sleep 1.5
-      second = strategy.run(["spec/passing_spec.rb"], 30)
+      second = strategy.run(["spec/passing_spec.rb"], 30, include_stdout: "always")
       puts JSON.generate(first: first, second: second)
     RUBY
 

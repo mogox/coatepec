@@ -14,6 +14,11 @@ RSpec.describe Coatepec::Introspection::Routes do
     allow(described_class).to receive(:rails_routes).and_return(routes)
   end
 
+  # The payload is columnar; zip it back into hashes so expectations stay readable.
+  def items_of(result)
+    result[:rows].map { |row| result[:columns].zip(row).to_h }
+  end
+
   # Only a ::Rails::Engine subclass is expanded, so the fake needs a stand-in base class.
   before { stub_const("Rails::Engine", Class.new) }
 
@@ -26,15 +31,25 @@ RSpec.describe Coatepec::Introspection::Routes do
     end
   end
 
+  it "returns a columnar payload" do
+    stub_routes([FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" })])
+
+    result = described_class.new.call
+
+    expect(result[:columns]).to eq(%w[name verb path controller action engine])
+    expect(result[:rows]).to eq([["widgets", "GET", "/widgets", "widgets", "index", nil]])
+    expect(result.keys).to eq(%i[columns rows matched limit offset next_offset engines engines_excluded])
+  end
+
   it "maps route fields including controller/action from defaults" do
     routes = [FakeRoute.new("widgets", "GET", "/widgets(.:format)", { controller: "widgets", action: "index" })]
     stub_routes(routes)
 
     result = described_class.new.call
 
-    expect(result[:items]).to eq(
-      [{ name: "widgets", verb: "GET", path: "/widgets(.:format)", controller: "widgets", action: "index",
-         engine: nil }]
+    expect(items_of(result)).to eq(
+      [{ "name" => "widgets", "verb" => "GET", "path" => "/widgets", "controller" => "widgets", "action" => "index",
+         "engine" => nil }]
     )
     expect(result[:matched]).to eq(1)
   end
@@ -48,7 +63,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(query: "WIDGET").call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(["widgets"])
+    expect(items_of(result).map { |r| r["name"] }).to eq(["widgets"])
     expect(result[:matched]).to eq(1)
   end
 
@@ -58,7 +73,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(limit: 2, offset: 1).call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[route2 route3])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[route2 route3])
     expect(result[:matched]).to eq(5)
     expect(result[:limit]).to eq(2)
     expect(result[:offset]).to eq(1)
@@ -82,7 +97,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(limit: 0).call
 
-    expect(result[:items]).to eq([])
+    expect(items_of(result)).to eq([])
     expect(result[:next_offset]).to be_nil
   end
 
@@ -97,9 +112,9 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(engines: "include").call
 
-    expect(result[:items].last).to eq(
-      { name: "audits", verb: "GET", path: "/widget_admin/audits(.:format)",
-        controller: "widget_admin/audits", action: "index", engine: "WidgetAdmin::Engine" }
+    expect(items_of(result).last).to eq(
+      { "name" => "audits", "verb" => "GET", "path" => "/widget_admin/audits",
+        "controller" => "widget_admin/audits", "action" => "index", "engine" => "WidgetAdmin::Engine" }
     )
   end
 
@@ -114,7 +129,7 @@ RSpec.describe Coatepec::Introspection::Routes do
     result = described_class.new(query: "widgetadmin", engines: "include").call
 
     expect(result[:matched]).to eq(1)
-    expect(result[:items].map { |r| r[:engine] }).to eq(["WidgetAdmin::Engine"])
+    expect(items_of(result).map { |r| r["engine"] }).to eq(["WidgetAdmin::Engine"])
   end
 
   it "caps limit at 200 even if a larger value is requested" do
@@ -152,10 +167,9 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new.call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[widgets widget_admin])
     expect(result[:engines]).to eq("exclude")
     expect(result[:engines_excluded]).to eq(1)
-    expect(result.keys).to eq(%i[items matched limit offset next_offset engines engines_excluded])
   end
 
   it "includes engine routes and reports zero excluded when engines is include" do
@@ -163,7 +177,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(engines: "include").call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin audits])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[widgets widget_admin audits])
     expect(result).to include(engines: "include", engines_excluded: 0)
   end
 
@@ -173,7 +187,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(query: "audit").call
 
-    expect(result[:items]).to eq([])
+    expect(items_of(result)).to eq([])
     expect(result[:matched]).to eq(0)
     expect(result[:engines_excluded]).to eq(1)
   end
@@ -193,7 +207,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(engines: "exclude").call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets widget_admin])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[widgets widget_admin])
     expect(result[:matched]).to eq(2)
     expect(result[:engines_excluded]).to eq(1)
   end
@@ -203,7 +217,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(engines: "only").call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[audits])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[audits])
     expect(result[:matched]).to eq(1)
     expect(result).to include(engines: "only", engines_excluded: 2)
   end
@@ -214,7 +228,7 @@ RSpec.describe Coatepec::Introspection::Routes do
 
     result = described_class.new(query: "widget", engines: "exclude", limit: 1).call
 
-    expect(result[:items].map { |r| r[:name] }).to eq(%w[widgets])
+    expect(items_of(result).map { |r| r["name"] }).to eq(%w[widgets])
     expect(result[:matched]).to eq(2)
     expect(result[:next_offset]).to eq(1)
     expect(result[:engines_excluded]).to eq(1)

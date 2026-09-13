@@ -41,7 +41,7 @@ module Coatepec
         @spawn_strategy = SpawnStrategy.new(project_root, adapter: @adapter)
       end
 
-      def run(args, timeout_seconds, include_passing: false, include_stdout: true)
+      def run(args, timeout_seconds, include_passing: false, include_stdout: "failures")
         result_options = { include_passing: include_passing, include_stdout: include_stdout }
         return fallback_result(args, timeout_seconds, "spawn_fallback", result_options) unless guard_passes?
 

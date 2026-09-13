@@ -6,14 +6,14 @@ require "coatepec/mcp/response"
 RSpec.describe Coatepec::MCP::Response do
   describe ".ok" do
     it "wraps data and meta in an ok envelope" do
-      response = described_class.ok(data: { foo: "bar" }, meta: { environment: "test" })
+      response = described_class.ok(data: { foo: "bar" }, meta: { duration_ms: 3 })
       payload = JSON.parse(response.content.first[:text])
 
       expect(response.error?).to be(false)
       expect(payload).to eq(
         "ok" => true,
         "data" => { "foo" => "bar" },
-        "meta" => { "environment" => "test" }
+        "meta" => { "duration_ms" => 3 }
       )
     end
 
@@ -47,6 +47,17 @@ RSpec.describe Coatepec::MCP::Response do
 
       expect(text).to include("\n")
       expect(JSON.parse(text)).to eq("ok" => true, "data" => { "foo" => "bar" }, "meta" => {})
+    end
+  end
+
+  describe ".meta" do
+    it "reports only the elapsed milliseconds since started_at" do
+      started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) - 0.25
+
+      meta = described_class.meta(started_at)
+
+      expect(meta.keys).to eq([:duration_ms])
+      expect(meta[:duration_ms]).to be_between(250, 2_000)
     end
   end
 

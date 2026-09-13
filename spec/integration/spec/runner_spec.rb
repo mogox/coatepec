@@ -16,7 +16,8 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
 
   it "reports a passing run for a passing spec" do
     stdout, stderr, status = run_in_worker(<<~RUBY)
-      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/passing_spec.rb"])
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect})
+                                     .run(paths: ["spec/passing_spec.rb"], include_stdout: "always")
       puts JSON.generate(result)
     RUBY
 
@@ -33,6 +34,20 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     # child's *stdout* pipe, not leak into stderr or the protocol fd.
     expect(result["stdout"]).to include("1 example, 0 failures")
     expect(result["stdout_truncated"]).to be(false)
+  end
+
+  it "returns stdout as null for a passing run by default" do
+    stdout, stderr, status = run_in_worker(<<~RUBY)
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/passing_spec.rb"])
+      puts JSON.generate(result)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result["status"]).to eq("passed")
+    expect(result).to have_key("stdout")
+    expect(result["stdout"]).to be_nil
   end
 
   it "returns passing examples when include_passing is true" do
@@ -52,7 +67,8 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
 
   it "runs a spec that requires rails_helper against the warm Rails boot" do
     stdout, stderr, status = run_in_worker(<<~RUBY)
-      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect}).run(paths: ["spec/rails_boot_spec.rb"])
+      result = Coatepec::Spec::Runner.new(#{FIXTURE_APP_ROOT.inspect})
+                                     .run(paths: ["spec/rails_boot_spec.rb"], include_stdout: "always")
       puts JSON.generate(result)
     RUBY
 

@@ -33,21 +33,27 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     end
   end
 
-  it "maps application routes in the given order with no engine and an unchanged path" do
+  it "maps application routes in the given order with no engine and the format suffix stripped" do
     first = route("/widgets(.:format)")
     second = route("/owners(.:format)")
 
     entries = described_class.call([first, second])
 
     expect(entries.map(&:route)).to eq([first, second])
-    expect(entries.map(&:path)).to eq(["/widgets(.:format)", "/owners(.:format)"])
+    expect(entries.map(&:path)).to eq(["/widgets", "/owners"])
     expect(entries.map(&:engine)).to eq([nil, nil])
+  end
+
+  it "strips the optional format segment from every path" do
+    entries = described_class.call([BareFakeRoute.new("/widgets(.:format)"), BareFakeRoute.new("/health")])
+
+    expect(entries.map(&:path)).to eq(["/widgets", "/health"])
   end
 
   it "handles routes that respond to neither internal nor app" do
     entries = described_class.call([BareFakeRoute.new("/widgets(.:format)")])
 
-    expect(entries.map(&:path)).to eq(["/widgets(.:format)"])
+    expect(entries.map(&:path)).to eq(["/widgets"])
     expect(entries.map(&:engine)).to eq([nil])
   end
 
@@ -65,8 +71,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     entries = described_class.call(routes)
 
     expect(entries.map(&:path)).to eq(
-      ["/widgets(.:format)", "/widget_admin(.:format)", "/up(.:format)",
-       "/widget_admin/audits(.:format)", "/widget_admin/audits/:id(.:format)"]
+      ["/widgets", "/widget_admin", "/up", "/widget_admin/audits", "/widget_admin/audits/:id"]
     )
     expect(entries.map(&:engine)).to eq([nil, nil, nil, "WidgetAdmin::Engine", "WidgetAdmin::Engine"])
   end
@@ -94,7 +99,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
 
     entries = described_class.call([mount("/", rack_app: engine)])
 
-    expect(entries.map(&:path)).to eq(["/", "/audits(.:format)"])
+    expect(entries.map(&:path)).to eq(["/", "/audits"])
   end
 
   it "drops internal routes inside a mounted engine" do
@@ -105,7 +110,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     entries = described_class.call([mount_route])
 
     expect(entries.map(&:route)).to eq([mount_route, inner])
-    expect(entries.map(&:path)).to eq(["/widget_admin(.:format)", "/widget_admin/audits(.:format)"])
+    expect(entries.map(&:path)).to eq(["/widget_admin", "/widget_admin/audits"])
   end
 
   it "skips a mounted Rack app that is not an engine" do
@@ -127,7 +132,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
 
     entries = described_class.call([mount("/impostor(.:format)", rack_app: impostor)])
 
-    expect(entries.map(&:path)).to eq(["/impostor(.:format)"])
+    expect(entries.map(&:path)).to eq(["/impostor"])
     expect(entries.map(&:engine)).to eq([nil])
   end
 
@@ -148,7 +153,7 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
     # The mount survives as a plain application entry with nothing flattened underneath it.
     entries = described_class.call([mount("/broken(.:format)", rack_app: engine)])
 
-    expect(entries.map(&:path)).to eq(["/broken(.:format)"])
+    expect(entries.map(&:path)).to eq(["/broken"])
     expect(entries.map(&:engine)).to eq([nil])
   end
 
@@ -158,6 +163,6 @@ RSpec.describe Coatepec::Introspection::RouteEntries do
 
     entries = described_class.call([mount("/widget_admin(.:format)", rack_app: outer)])
 
-    expect(entries.map(&:path)).to eq(["/widget_admin(.:format)", "/widget_admin/nested(.:format)"])
+    expect(entries.map(&:path)).to eq(["/widget_admin", "/widget_admin/nested"])
   end
 end

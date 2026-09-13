@@ -380,7 +380,7 @@ RSpec.describe Coatepec::Introspection::Controller do
 
     it "attaches the matching route to an action" do
       expect(action("index")[:routes])
-        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets(.:format)", route_name: "widgets",
+        .to eq([{ verb: "GET", path: "/controller_fixtures/widgets", route_name: "widgets",
                   engine: nil }])
     end
 
@@ -389,8 +389,8 @@ RSpec.describe Coatepec::Introspection::Controller do
       expect(action("update")[:routes].map { |r| r[:route_name] }).to eq([nil, nil])
     end
 
-    it "keeps the raw path spec so it matches rails_routes byte-for-byte" do
-      expect(action("show")[:routes].first[:path]).to eq("/controller_fixtures/widgets/:id(.:format)")
+    it "strips the format suffix so it matches rails_routes byte-for-byte" do
+      expect(action("show")[:routes].first[:path]).to eq("/controller_fixtures/widgets/:id")
     end
 
     it "reports an action no route reaches as unroutable" do
@@ -405,7 +405,7 @@ RSpec.describe Coatepec::Introspection::Controller do
 
     it "ignores routes belonging to other controllers and routes with no controller" do
       all_paths = result[:actions].flat_map { |a| a[:routes] }.map { |r| r[:path] }
-      expect(all_paths).not_to include("/other(.:format)", "/up(.:format)")
+      expect(all_paths).not_to include("/other", "/up")
     end
 
     # Rails hands back the engine class itself, whose .routes is a RouteSet wrapping its own routes.
@@ -439,10 +439,10 @@ RSpec.describe Coatepec::Introspection::Controller do
 
       index = engine_result[:actions].find { |a| a[:name] == "index" }
       # Mount prefix on the path and `engine` set, exactly as rails_routes reports the same route.
-      expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits(.:format)", route_name: "audits",
+      expect(index[:routes]).to eq([{ verb: "GET", path: "/widget_admin/audits", route_name: "audits",
                                       engine: "WidgetAdmin::Engine" }])
       expect(engine_result[:actions].find { |a| a[:name] == "show" }[:routes].first[:path])
-        .to eq("/widget_admin/audits/:id(.:format)")
+        .to eq("/widget_admin/audits/:id")
       expect(engine_result[:unroutable_actions]).to eq(["export"])
       expect(engine_result[:routes_without_action]).to eq([])
     end

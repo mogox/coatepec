@@ -37,6 +37,20 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(status_enum["values"]).to eq({ "draft" => 0, "published" => 1 })
   end
 
+  it "returns counts always and only the requested sections" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      puts JSON.generate(Coatepec::Introspection::Model.new("Widget", fields: ["enums"]).call)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result.keys).to eq(%w[name table_name primary_key abstract_class counts enums])
+    expect(result["counts"]["columns"]).to be > 0
+    expect(result["counts"]["associations"]).to eq(2)
+    expect(result["enums"].first["name"]).to eq("status")
+  end
+
   it "keeps primitive validator options but drops non-primitive ones (e.g. Proc for if:)" do
     stdout, stderr, status = run_model_call(<<~RUBY)
       result = Coatepec::Introspection::Model.new("Owner").call

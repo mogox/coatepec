@@ -19,7 +19,7 @@ module Coatepec
         @rails_runtime = rails_runtime
       end
 
-      def run(args, timeout_seconds, include_passing: false, include_stdout: true)
+      def run(args, timeout_seconds, include_passing: false, include_stdout: "failures")
         out_r, out_w = IO.pipe
         err_r, err_w = IO.pipe
         json_path = Tempfile.create(["coatepec-rspec", ".json"], &:path)

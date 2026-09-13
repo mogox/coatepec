@@ -60,7 +60,7 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy do
 
     def retry_after(started_at, crashed = { stderr: "" })
       strategy.send(:retry_after_crash, ["spec/passing_spec.rb"], 30, started_at, crashed,
-                    { include_passing: false, include_stdout: true })
+                    { include_passing: false, include_stdout: "failures" })
     end
 
     it "passes the spawn fallback the budget left after the fork attempt" do
@@ -75,7 +75,7 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy do
       retry_after(Process.clock_gettime(Process::CLOCK_MONOTONIC) - 100)
 
       expect(spawn_strategy).to have_received(:run)
-        .with(anything, described_class::MIN_RETRY_TIMEOUT_SECONDS, include_passing: false, include_stdout: true)
+        .with(anything, described_class::MIN_RETRY_TIMEOUT_SECONDS, include_passing: false, include_stdout: "failures")
     end
 
     it "carries the crashed fork's stderr through on the result" do
@@ -117,6 +117,10 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy do
       result = { signaled: true, termsig: Signal.list["TERM"] }
 
       expect(strategy.send(:crashed?, result)).to be(false)
+    end
+
+    it "treats a result without process fields as a normal exit" do
+      expect(strategy.send(:crashed?, {})).to be(false)
     end
   end
 end

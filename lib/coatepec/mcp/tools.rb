@@ -14,13 +14,13 @@ module Coatepec
           fail_fast: { type: "boolean" },
           timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
           include_passing: { type: "boolean" },
-          include_stdout: { type: "boolean" }
+          include_stdout: { type: "string", enum: %w[failures always never] }
         },
         required: ["paths"],
         additionalProperties: false
       }.freeze
 
-      # Both tool names share this clause, so the wording cannot drift between them.
+      # Kept a constant so the vocabulary clause stays readable next to the rest of the description.
       RSPEC_VOCABULARY =
         "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
         "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
@@ -29,70 +29,45 @@ module Coatepec
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector " \
-                  "paths#{RSPEC_VOCABULARY}" \
+                  "paths; there is no separate Minitest tool#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
+                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-                 include_passing: false, include_stdout: true)
+                 include_passing: false, include_stdout: "failures")
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
             include_passing: include_passing, include_stdout: include_stdout
           )
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
 
-    # Alias of rails_spec_run for agents that reason from "this app uses
-    # Minitest". Same schema object, same inherited #call; only the name
-    # and description differ. The mcp gem's Tool.inherited resets every
-    # declared attribute on a subclass, so each must be redeclared here.
-    class TestRunTool < SpecRunTool
-      tool_name "rails_test_run"
-      description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
-                  "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either " \
-                  "name#{RSPEC_VOCABULARY}" \
-                  "; returns only failed and pending examples unless include_passing is true" \
-                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(**INPUT_SCHEMA)
-    end
-
-    # The `rails_runtime_status` MCP tool: reports the test worker's Ruby/Rails
-    # versions, PID, boot_id, and lifecycle state. Worker::Server#handle boots
-    # the Rails runtime before dispatching any command, so the first call to
-    # this tool starts (and blocks on) a full Rails boot just like a spec run.
+    # The `rails_runtime_status` MCP tool: reports the test worker's
+    # Ruby/Rails versions, PID, boot_id, lifecycle state and the project
+    # root. Worker::Server#handle boots the Rails runtime before dispatching
+    # any command, so the first call to this tool starts (and blocks on) a
+    # full Rails boot just like a spec run.
     class RuntimeStatusTool < ::MCP::Tool
       tool_name "rails_runtime_status"
       description "Report the Coatepec test worker's identity and boot status " \
-                  "(boots the warm worker if it is not up yet)"
+                  "(boots the warm worker if it is not up yet); includes the project root as project_root"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(properties: {}, required: [], additionalProperties: false)
 
       class << self
         def call(server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].status
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          Response.ok(data: data,
-                      meta: { project_root: server_context[:project_root], environment: "test",
-                              duration_ms: duration_ms })
+          data = server_context[:worker_manager].status.merge(project_root: server_context[:project_root])
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
         end
@@ -114,10 +89,7 @@ module Coatepec
         def call(server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].restart!
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          Response.ok(data: data,
-                      meta: { project_root: server_context[:project_root], environment: "test",
-                              duration_ms: duration_ms })
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
         end
@@ -154,28 +126,11 @@ module Coatepec
           data = server_context[:worker_manager].check_flaky(
             paths: paths, example: example, timeout_seconds: timeout_seconds, runs: runs
           )
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
         end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
-        end
       end
-    end
-
-    # Alias of rails_spec_flaky_check; see TestRunTool for why the
-    # attributes are redeclared.
-    class TestFlakyCheckTool < FlakyCheckTool
-      tool_name "rails_test_flaky_check"
-      description "Alias of rails_spec_flaky_check: rerun targeted Minitest tests or RSpec examples with random " \
-                  "seeds to detect flakiness -- identical behaviour under either name"
-      annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
-      input_schema(**INPUT_SCHEMA)
     end
 
     # The `rails_routes` MCP tool: lists/filters/paginates the target
@@ -188,9 +143,10 @@ module Coatepec
                   "(application routes, under \"only\"); pass " \
                   "engines: \"include\" to list both or \"only\" for engine routes alone. Engine routes are " \
                   "expanded one level deep, carry the mount point in their path, and name their engine in the " \
-                  "engine field (null for an application route; query also matches that field); returns up to " \
-                  "limit items (default 100) with next_offset -- the offset to pass back for the next page, " \
-                  "null on the last one"
+                  "engine field (null for an application route; query also matches that field); returns columns " \
+                  "(name, verb, path, controller, action, engine) and up to limit rows (default 100) in that " \
+                  "order, paths without the (.:format) suffix Rails appends, with next_offset -- the offset to " \
+                  "pass back for the next page, null on the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
@@ -207,16 +163,9 @@ module Coatepec
         def call(server_context:, query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -226,33 +175,30 @@ module Coatepec
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
       description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data; validators are de-duplicated by class, attributes and options, so the list " \
-                  "holds distinct validators and can be shorter than klass.validators; an array-valued validator " \
-                  "option longer than 20 entries keeps its first 20 with <option>_count and <option>_truncated " \
-                  "beside it"
+                  "without row data; counts (the size of each of those four lists, each capped at 200) is always " \
+                  "present, and fields (any of columns, associations, validators, enums) limits which lists are " \
+                  "returned -- fields: [] is the cheapest way to answer a how-many question; validators are " \
+                  "de-duplicated by class, attributes and options, so the list holds distinct validators and can " \
+                  "be shorter than klass.validators; an array-valued validator option longer than 20 entries " \
+                  "keeps its first 20 with <option>_count and <option>_truncated beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
-          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' }
+          name: { type: "string", pattern: '^[A-Z]\w*(?:::[A-Z]\w*)*$' },
+          fields: { type: "array", items: { type: "string", enum: %w[columns associations validators enums] },
+                    uniqueItems: true }
         },
         required: ["name"],
         additionalProperties: false
       )
 
       class << self
-        def call(name:, server_context:)
+        def call(name:, server_context:, fields: nil)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].model(name: name)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          data = server_context[:worker_manager].model(name: name, fields: fields)
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end
@@ -276,16 +222,9 @@ module Coatepec
         def call(name:, server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].controller(name: name)
-          Response.ok(data: data, meta: meta_for(server_context, started_at))
+          Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
-        end
-
-        private
-
-        def meta_for(server_context, started_at)
-          duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round
-          { project_root: server_context[:project_root], environment: "test", duration_ms: duration_ms }
         end
       end
     end

@@ -56,25 +56,25 @@ RSpec.describe Coatepec::WorkerManager do
         .with("spec_run", hash_including(include_passing: true), timeout: 40).ordered
     end
 
-    it "dispatches include_stdout, defaulting it to true" do
+    it "dispatches include_stdout, defaulting it to failures" do
       client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { status: "passed" })
       allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
 
       manager.run_spec(paths: ["spec/models/widget_spec.rb"], example: nil, seed: nil, fail_fast: false,
                        timeout_seconds: 30)
       manager.run_spec(paths: ["spec/models/widget_spec.rb"], example: nil, seed: nil, fail_fast: false,
-                       timeout_seconds: 30, include_stdout: false)
+                       timeout_seconds: 30, include_stdout: "never")
 
       expect(client).to have_received(:request)
-        .with("spec_run", hash_including(include_stdout: true), timeout: 40).ordered
+        .with("spec_run", hash_including(include_stdout: "failures"), timeout: 40).ordered
       expect(client).to have_received(:request)
-        .with("spec_run", hash_including(include_stdout: false), timeout: 40).ordered
+        .with("spec_run", hash_including(include_stdout: "never"), timeout: 40).ordered
     end
   end
 
   describe "#routes" do
     it "dispatches engines, defaulting it to exclude" do
-      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { items: [] })
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { rows: [] })
       allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
 
       manager.routes(query: "talk")
@@ -84,6 +84,21 @@ RSpec.describe Coatepec::WorkerManager do
         .with("routes", { query: "talk", limit: 100, offset: 0, engines: "exclude" }, timeout: 30).ordered
       expect(client).to have_received(:request)
         .with("routes", { query: "talk", limit: 100, offset: 0, engines: "only" }, timeout: 30).ordered
+    end
+  end
+
+  describe "#model" do
+    it "dispatches fields, defaulting it to nil (every section)" do
+      client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { name: "Widget" })
+      allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
+
+      manager.model(name: "Widget")
+      manager.model(name: "Widget", fields: ["enums"])
+
+      expect(client).to have_received(:request)
+        .with("model", { name: "Widget", fields: nil }, timeout: 30).ordered
+      expect(client).to have_received(:request)
+        .with("model", { name: "Widget", fields: ["enums"] }, timeout: 30).ordered
     end
   end
 

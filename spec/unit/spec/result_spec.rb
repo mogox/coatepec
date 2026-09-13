@@ -101,26 +101,74 @@ RSpec.describe Coatepec::Spec::Result do
             "bin/rails test test/t_test.rb:%d\n\n"
     text = "# Running:\n\nEE\n\n#{format(block, "a", 3, 2)}#{format(block, "b", 7, 6)}2 runs, 2 errors\n"
 
-    result = build_with_stdout(text)
+    result = build_with_stdout(text, include_stdout: "always")
 
     expect(result[:stdout].scan("RuntimeError: boom").size).to eq(1)
     expect(result[:stdout]).to include("1 more test failed with this same error: T#test_b\n")
     expect(result[:stdout_truncated]).to be(false)
   end
 
-  it "drops captured stdout text when include_stdout is false but still reports truncation" do
-    result = build_with_stdout("x" * (described_class::MAX_OUTPUT_BYTES + 1), include_stdout: false)
+  it "drops captured stdout text when include_stdout is never but still reports truncation" do
+    result = build_with_stdout("x" * (described_class::MAX_OUTPUT_BYTES + 1), include_stdout: "never")
 
     expect(result[:stdout]).to be_nil
     expect(result[:stdout_truncated]).to be(true)
   end
 
-  it "nulls stdout but keeps the key when include_stdout is false" do
-    result = build([example("b", "failed")], include_stdout: false)
+  it "nulls stdout but keeps the key when include_stdout is never" do
+    result = build([example("b", "failed")], include_stdout: "never")
 
     expect(result).to have_key(:stdout)
     expect(result[:stdout]).to be_nil
     expect(result[:stderr]).to eq("")
     expect(result.keys.index(:stdout)).to eq(result.keys.index(:stdout_truncated) - 1)
+  end
+
+  it "drops stdout on a passing run by default and keeps it on a failing one" do
+    passed = build_with_stdout("1 example, 0 failures\n")
+    failed_status = Process.wait2(Process.spawn("false")).last
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    out_w.write("1 example, 1 failure\n")
+    [out_w, err_w].each(&:close)
+    failed = described_class.build(pid: 1, status: failed_status, out_r: out_r, err_r: err_r,
+                                   json_path: summary_file([example("b", "failed")]))
+
+    expect(passed[:stdout]).to be_nil
+    expect(failed[:stdout]).to eq("1 example, 1 failure\n")
+  ensure
+    [out_r, err_r].compact.each(&:close)
+  end
+
+  it "keeps stdout on a passing run when include_stdout is always" do
+    result = build_with_stdout("1 example, 0 failures\n", include_stdout: "always")
+
+    expect(result[:stdout]).to eq("1 example, 0 failures\n")
+  end
+
+  it "rejects an unknown include_stdout mode" do
+    expect { build([], include_stdout: "sometimes") }
+      .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_include_stdout) }
+  end
+
+  it "omits the process fields when the child exited normally" do
+    result = build([example("b", "failed")])
+
+    expect(result.keys).to eq(%i[status exit_code stdout stdout_truncated stderr stderr_truncated summary examples])
+  end
+
+  # A child killed by a signal (a timeout's TERM/KILL, a crash) has no exit code; the signal fields say what happened.
+  it "reports the process fields after exit_code when the child was signaled" do
+    signaled = Process.wait2(Process.spawn("sh", "-c", "kill -KILL $$")).last
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    [out_w, err_w].each(&:close)
+    result = described_class.build(pid: 42, status: signaled, out_r: out_r, err_r: err_r, json_path: summary_file([]))
+
+    expect(result[:status]).to eq("failed")
+    expect(result.keys.first(7)).to eq(%i[status exit_code child_pid signaled termsig stopsig coredump])
+    expect(result).to include(child_pid: 42, signaled: true, termsig: Signal.list["KILL"], exit_code: nil)
+  ensure
+    [out_r, err_r].compact.each(&:close)
   end
 end

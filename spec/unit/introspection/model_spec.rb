@@ -3,12 +3,12 @@
 require "spec_helper"
 require "coatepec/introspection/model"
 
-# Coatepec::Introspection::Model#resolve! calls ::ActiveSupport::Inflector
+# Coatepec::Introspection::ModelResolver.call calls ::ActiveSupport::Inflector
 # directly, relying on Rails already being booted by the time it's actually
 # invoked in this gem's real architecture (see model.rb for the full
-# rationale). The examples below deliberately call #resolve! without
-# booting Rails, so this file -- and only this file -- needs to load that
-# one piece of ActiveSupport itself to exercise that path in isolation.
+# rationale). The examples below deliberately go through ModelResolver.call
+# without booting Rails, so this file -- and only this file -- needs to load
+# that one piece of ActiveSupport itself to exercise that path in isolation.
 require "active_support/inflector"
 
 RSpec.describe Coatepec::Introspection::Model do
@@ -68,6 +68,44 @@ RSpec.describe Coatepec::Introspection::Model do
 
       expect { described_class.new("PlainClass").call }
         .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:not_active_record_model) }
+    end
+  end
+
+  describe "#build_metadata sections (private, unit-level)" do
+    # A Struct stands in for an ActiveRecord class: build_metadata only calls these eight readers on it.
+    let(:klass) do
+      Struct.new(:name, :abstract_class?, :table_name, :primary_key, :columns, :reflect_on_all_associations,
+                 :validators, :defined_enums).new("Widget", false, "widgets", "id", [], [], [], {})
+    end
+
+    it "returns every section plus counts by default" do
+      result = described_class.new("Widget").send(:build_metadata, klass)
+
+      expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts columns associations validators
+                                   enums])
+      expect(result[:counts]).to eq(columns: 0, associations: 0, validators: 0, enums: 0)
+    end
+
+    it "returns only the requested sections, in canonical order, with counts for all four" do
+      result = described_class.new("Widget", fields: %w[validators columns]).send(:build_metadata, klass)
+
+      expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts columns validators])
+    end
+
+    it "returns counts alone for fields: []" do
+      result = described_class.new("Widget", fields: []).send(:build_metadata, klass)
+
+      expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts])
+    end
+
+    it "rejects an unknown field" do
+      expect { described_class.new("Widget", fields: %w[columns rows]) }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_model_fields) }
+    end
+
+    it "rejects fields that is not an array" do
+      expect { described_class.new("Widget", fields: "columns") }
+        .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_model_fields) }
     end
   end
 

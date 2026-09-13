@@ -18,7 +18,7 @@ module Coatepec
       end
 
       def run(paths:, example: nil, seed: nil, fail_fast: false, timeout_seconds: DEFAULT_TIMEOUT,
-              include_passing: false, include_stdout: true)
+              include_passing: false, include_stdout: "failures")
         validated = @path_policy.validate!(paths)
         adapter = adapter_for(validated[:framework])
         adapter.require_framework!
