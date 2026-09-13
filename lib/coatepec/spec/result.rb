@@ -39,26 +39,25 @@ module Coatepec
         examples.first(MAX_EXAMPLES)
       end
 
-      # rubocop:disable Metrics/MethodLength -- one flat hash literal mapping
-      # Process::Status/captured-output fields to the result payload's own
-      # field names; splitting it would scatter that 1:1 mapping across
-      # methods for no readability gain.
       def base(pid, status, stdout_result, stderr_result)
         {
           status: status.exited? && status.exitstatus.zero? ? "passed" : "failed",
           exit_code: status.exitstatus,
-          child_pid: pid,
-          signaled: status.signaled?,
-          termsig: status.termsig,
-          stopsig: status.stopsig,
-          coredump: status.respond_to?(:coredump?) ? status.coredump? : false,
+          **process_fields(pid, status),
           stdout: stdout_result[:text],
           stdout_truncated: stdout_result[:truncated],
           stderr: stderr_result[:text],
           stderr_truncated: stderr_result[:truncated]
         }
       end
-      # rubocop:enable Metrics/MethodLength
+
+      # A normal exit has nothing to say about signals; these five appear only when the child did not exit.
+      def process_fields(pid, status)
+        return {} if status.exited?
+
+        { child_pid: pid, signaled: status.signaled?, termsig: status.termsig, stopsig: status.stopsig,
+          coredump: status.respond_to?(:coredump?) ? status.coredump? : false }
+      end
 
       def read_summary(json_path)
         return nil unless File.exist?(json_path) && !File.empty?(json_path)

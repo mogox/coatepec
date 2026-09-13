@@ -123,4 +123,25 @@ RSpec.describe Coatepec::Spec::Result do
     expect(result[:stderr]).to eq("")
     expect(result.keys.index(:stdout)).to eq(result.keys.index(:stdout_truncated) - 1)
   end
+
+  it "omits the process fields when the child exited normally" do
+    result = build([example("b", "failed")])
+
+    expect(result.keys).to eq(%i[status exit_code stdout stdout_truncated stderr stderr_truncated summary examples])
+  end
+
+  # A child killed by a signal (a timeout's TERM/KILL, a crash) has no exit code; the signal fields say what happened.
+  it "reports the process fields after exit_code when the child was signaled" do
+    signaled = Process.wait2(Process.spawn("sh", "-c", "kill -KILL $$")).last
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    [out_w, err_w].each(&:close)
+    result = described_class.build(pid: 42, status: signaled, out_r: out_r, err_r: err_r, json_path: summary_file([]))
+
+    expect(result[:status]).to eq("failed")
+    expect(result.keys.first(7)).to eq(%i[status exit_code child_pid signaled termsig stopsig coredump])
+    expect(result).to include(child_pid: 42, signaled: true, termsig: Signal.list["KILL"], exit_code: nil)
+  ensure
+    [out_r, err_r].compact.each(&:close)
+  end
 end

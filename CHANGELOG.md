@@ -91,6 +91,10 @@
 - Every tool response's `meta` is now just `duration_ms`; `project_root` is
   reported once by `rails_runtime_status` (beside `environment`) instead of
   on every call.
+- `rails_spec_run` results carry `child_pid`, `signaled`, `termsig`,
+  `stopsig` and `coredump` only when the child did not exit normally (a
+  timeout kill or a crash); a normal run reports `status`, `exit_code` and
+  the output fields alone.
 
 ## 0.7.0
 
