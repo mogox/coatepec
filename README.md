@@ -130,12 +130,12 @@ a no-op.
 
 | Tool | Input | Notes |
 |---|---|---|
-| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?` | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; returns `summary` counts plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples) |
+| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?`, `include_stdout?` | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; failure blocks in `stdout` that repeat an earlier block's error verbatim are replaced by a roll-up line naming the tests; returns `summary` counts plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples); `include_stdout: false` nulls `stdout` (the per-test verdicts in `examples` and the counts in `summary` are unaffected) |
 | `rails_test_run` | same as `rails_spec_run` | Alias of `rails_spec_run` -- identical behaviour under either name |
 | `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state |
 | `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?` | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
-| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`include`/`exclude`/`only`, default `include`) | Case-insensitive filter across name/verb/path/controller/action/engine. Routes of mounted engines are included -- one level deep, paths prefixed with the mount point -- and each item carries `engine` (`null` for an application route, the engine class name otherwise). `engines: "exclude"` returns application routes only (the engine's mount route counts as one), `"only"` the engine routes; the filter applies before `query`, so `matched`/`next_offset` describe the filtered set. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
+| `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`) | ActiveRecord models only; columns, associations, validators, enums -- no row data; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
 | `rails_test_flaky_check` | same as `rails_spec_flaky_check` | Alias of `rails_spec_flaky_check` |
@@ -150,6 +150,11 @@ a no-op.
   action -- not just the path -- so a resource name alone typically returns
   every route for that resource (index/create/new/...); narrow further with
   something like `query: "new_widget"` to hit one route by name.
+- "What's the URL for widgets, ignoring the admin engine?" --
+  `rails_routes(query: "widget", engines: "exclude")`. In an app with a
+  mounted admin engine the engine's CRUD scaffolding is often two thirds of
+  every match; `engines: "exclude"` leaves the application's own routes (the
+  mount route itself included), `engines: "only"` the engine's.
 - "Which routes accept POST?" -- `rails_routes(query: "POST")`, the same
   substring match applied to the verb column.
 - "Which routes does the Avo engine add?" -- `rails_routes(query: "Avo::Engine")`
@@ -177,6 +182,10 @@ a no-op.
   `columns[].default`.
 - "What validations and associations does Widget enforce?" -- same call --
   see `validators` and `associations`.
+- A long allow-list is summarised, not enumerated: `validates :country_code,
+  inclusion: { in: ISO_CODES }` with 249 codes comes back as `"in"` holding
+  the first 20, `"in_count": 249` and `"in_truncated": true`. A list of 20 or
+  fewer has no `_count`/`_truncated` siblings.
 - "What happens if I ask about a non-model class, like a controller?" --
   `rails_model(name: "ApplicationController")` raises `not_active_record_model`
   rather than introspecting it (a nonexistent constant raises `model_not_found`

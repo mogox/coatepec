@@ -61,6 +61,26 @@
 - `rails_routes` defaults to 100 items per page (was 50 -- engine expansion
   roughly doubled route counts) and returns `next_offset` for the follow-up
   call, `null` on the last page.
+- `rails_spec_run`/`rails_test_run`: when several tests fail with the same
+  error text (a broken layout erroring every controller test, say), `stdout`
+  keeps the first failure block and replaces each repeat with one roll-up line
+  naming the other tests -- a 5-error controller run drops from ~4,850 B to
+  roughly a third of that. Backtrace frames and RSpec's `Failure/Error:`
+  source line are ignored when deciding that two blocks match.
+- `rails_spec_run`/`rails_test_run` gain `include_stdout` (default `true`).
+  `include_stdout: false` returns `stdout: null` -- the key stays so the result
+  shape is uniform -- for callers that only read `summary` and `examples`.
+  `stderr` is always returned.
+- `rails_routes` gains `engines` (`include`, the default; `exclude`; `only`).
+  `exclude` returns application routes only -- an engine's mount route counts
+  as one -- and `only` the mounted engines' routes. The filter applies before
+  `query`, so `matched` and `next_offset` describe the filtered set. On an app
+  with a mounted admin engine a typical resource query shrinks by about 60%.
+- `rails_model` cuts an array-valued validator option longer than 20 entries
+  to its first 20 and adds `<option>_count` (the full length) and
+  `<option>_truncated: true` beside it -- a 249-code `inclusion` list no
+  longer costs 1.4 KB per model. Shorter lists are unchanged and carry no
+  sibling keys.
 
 ## 0.7.0
 

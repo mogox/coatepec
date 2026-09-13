@@ -11,7 +11,7 @@ RSpec.describe "Coatepec MCP tools" do
     it "returns an ok envelope with the runner's data" do
       allow(worker_manager).to receive(:run_spec)
         .with(paths: ["spec/x_spec.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false)
+              include_passing: false, include_stdout: true)
         .and_return(status: "passed")
 
       response = described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
@@ -44,6 +44,22 @@ RSpec.describe "Coatepec MCP tools" do
 
     it "declares include_passing as a boolean input" do
       expect(described_class.input_schema.to_h.dig(:properties, :include_passing)).to eq(type: "boolean")
+    end
+
+    it "forwards include_stdout to the worker manager and defaults it to true" do
+      allow(worker_manager).to receive(:run_spec).and_return(status: "passed", examples: [])
+
+      described_class.call(paths: ["spec/x_spec.rb"], server_context: server_context)
+      described_class.call(paths: ["spec/x_spec.rb"], include_stdout: false, server_context: server_context)
+
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: true)).ordered
+      expect(worker_manager).to have_received(:run_spec).with(hash_including(include_stdout: false)).ordered
+    end
+
+    it "declares include_stdout as a boolean input and documents it" do
+      expect(described_class.input_schema.to_h.dig(:properties, :include_stdout)).to eq(type: "boolean")
+      expect(described_class.description).to include("include_stdout")
+      expect(Coatepec::MCP::TestRunTool.description).to include("include_stdout")
     end
   end
 
@@ -92,9 +108,27 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("next_offset")
     end
 
+    it "leads its description with the engines filter and declares it as an enum" do
+      expect(described_class.description)
+        .to start_with("Return a bounded, filterable list of the Rails app's routes; engines: \"exclude\"")
+      expect(described_class.input_schema.to_h.dig(:properties, :engines))
+        .to eq(type: "string", enum: %w[include exclude only])
+    end
+
+    it "forwards engines to the worker manager and defaults it to include" do
+      allow(worker_manager).to receive(:routes).and_return(items: [], matched: 0, limit: 100, offset: 0,
+                                                           next_offset: nil)
+
+      described_class.call(server_context: server_context)
+      described_class.call(engines: "exclude", server_context: server_context)
+
+      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "include")).ordered
+      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "exclude")).ordered
+    end
+
     it "returns an ok envelope with the routes data" do
       allow(worker_manager).to receive(:routes)
-        .with(query: "widgets", limit: 50, offset: 0)
+        .with(query: "widgets", limit: 50, offset: 0, engines: "include")
         .and_return(items: [], matched: 0, limit: 50, offset: 0)
 
       response = described_class.call(query: "widgets", limit: 50, offset: 0, server_context: server_context)
@@ -110,7 +144,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       described_class.call(server_context: server_context)
 
-      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0)
+      expect(worker_manager).to have_received(:routes).with(query: nil, limit: 100, offset: 0, engines: "include")
     end
 
     it "returns an error envelope when the worker manager raises" do
@@ -212,7 +246,7 @@ RSpec.describe "Coatepec MCP tools" do
 
       allow(worker_manager).to receive(:run_spec)
         .with(paths: ["test/models/x_test.rb"], example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-              include_passing: false)
+              include_passing: false, include_stdout: true)
         .and_return(status: "passed")
       response = described_class.call(paths: ["test/models/x_test.rb"], server_context: server_context)
 
@@ -265,6 +299,11 @@ RSpec.describe "Coatepec MCP tools" do
       expect do
         Coatepec::MCP::FlakyCheckTool.input_schema.validate_arguments("paths" => ["spec/x_spec.rb"], "oops" => 1)
       end.to raise_error(::MCP::Tool::InputSchema::ValidationError, /disallowed additional property/)
+    end
+
+    it "rejects an engines value outside include/exclude/only on rails_routes" do
+      expect { Coatepec::MCP::RoutesTool.input_schema.validate_arguments("engines" => "some") }
+        .to raise_error(::MCP::Tool::InputSchema::ValidationError)
     end
 
     it "still accepts the documented rails_spec_run arguments" do

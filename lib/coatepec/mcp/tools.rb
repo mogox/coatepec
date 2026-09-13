@@ -13,7 +13,8 @@ module Coatepec
           seed: { type: %w[integer null], minimum: 0, maximum: 65_535 },
           fail_fast: { type: "boolean" },
           timeout_seconds: { type: "integer", minimum: 1, maximum: 900 },
-          include_passing: { type: "boolean" }
+          include_passing: { type: "boolean" },
+          include_stdout: { type: "boolean" }
         },
         required: ["paths"],
         additionalProperties: false
@@ -22,17 +23,19 @@ module Coatepec
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
                   "against a warm, isolated Rails test worker; the framework is chosen from the selector paths" \
-                  "; returns only failed and pending examples unless include_passing is true"
+                  "; returns only failed and pending examples unless include_passing is true" \
+                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
+                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
         def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-                 include_passing: false)
+                 include_passing: false, include_stdout: true)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           data = server_context[:worker_manager].run_spec(
             paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
-            include_passing: include_passing
+            include_passing: include_passing, include_stdout: include_stdout
           )
           Response.ok(data: data, meta: meta_for(server_context, started_at))
         rescue Coatepec::Error => e
@@ -56,7 +59,9 @@ module Coatepec
       tool_name "rails_test_run"
       description "Alias of rails_spec_run: run targeted Minitest tests (test/**/*_test.rb) or RSpec examples " \
                   "(spec/**/*_spec.rb) against the warm Rails test worker -- identical behaviour under either name" \
-                  "; returns only failed and pending examples unless include_passing is true"
+                  "; returns only failed and pending examples unless include_passing is true" \
+                  "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
+                  "; pass include_stdout: false to drop stdout when summary and examples are enough"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
     end
@@ -169,26 +174,29 @@ module Coatepec
     # Rails app's routes.
     class RoutesTool < ::MCP::Tool
       tool_name "rails_routes"
-      description "Return a bounded, filterable list of the Rails app's routes, including the routes of mounted " \
-                  "engines (one level deep; paths carry the mount point; each item's engine field names the " \
-                  "engine, null for an application route; query also matches the engine field)" \
-                  "; returns up to limit items (default 100) with next_offset -- the offset to pass back " \
-                  "for the next page, null on the last one"
+      description "Return a bounded, filterable list of the Rails app's routes; engines: \"exclude\" returns " \
+                  "application routes only (the cheapest answer to \"what is the URL for X\"), \"only\" returns " \
+                  "mounted-engine routes only, and the default \"include\" lists both. Engine routes are expanded " \
+                  "one level deep, carry the mount point in their path, and name their engine in the engine " \
+                  "field (null for an application route; query also matches that field); returns up to limit " \
+                  "items (default 100) with next_offset -- the offset to pass back for the next page, null on " \
+                  "the last one"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
           query: { type: %w[string null] },
           limit: { type: "integer", minimum: 1, maximum: 200 },
-          offset: { type: "integer", minimum: 0 }
+          offset: { type: "integer", minimum: 0 },
+          engines: { type: "string", enum: %w[include exclude only] }
         },
         required: [],
         additionalProperties: false
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 100, offset: 0)
+        def call(server_context:, query: nil, limit: 100, offset: 0, engines: "include")
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset)
+          data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
           Response.ok(data: data, meta: meta_for(server_context, started_at))
         rescue Coatepec::Error => e
           Response.error(e)
