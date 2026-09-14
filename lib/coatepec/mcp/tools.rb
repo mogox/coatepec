@@ -24,7 +24,8 @@ module Coatepec
       RSPEC_VOCABULARY =
         "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
         "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
-        "stdout) and a skip is pending"
+        "stdout; summary.error_count says how many of those were errors) and a skip is pending" \
+        "; summary.assertion_count is Minitest's assertion total, null for RSpec, as is error_count"
 
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \

@@ -14,12 +14,12 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
 
   after { FileUtils.rm_rf(root) }
 
-  def result(name, line, failure = nil)
+  def result(name, line, failure = nil, assertions: 1)
     r = ::Minitest::Result.new(name)
     r.klass = "WidgetTest"
     r.source_location = [test_file, line]
     r.time = 0.25
-    r.assertions = 1
+    r.assertions = assertions
     r.failures = [failure].compact
     r
   end
@@ -65,6 +65,28 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
     expect(doc["summary"]["duration"]).to be_a(Float)
   end
 
+  it "sums assertions across results and counts errors separately from failures" do
+    doc = run_reporter(result("test_a", 1, nil, assertions: 3),
+                       result("test_fails", 4, ::Minitest::Assertion.new("nope"), assertions: 2),
+                       result("test_errors", 7, ::Minitest::UnexpectedError.new(RuntimeError.new("boom"))),
+                       result("test_skips", 9, ::Minitest::Skip.new("later"), assertions: 0))
+
+    expect(doc["summary"].keys)
+      .to eq(%w[example_count failure_count error_count pending_count assertion_count duration])
+    expect(doc["summary"]).to include("failure_count" => 2, "error_count" => 1, "assertion_count" => 6)
+  end
+
+  it "resets the totals when a run starts" do
+    reporter = described_class.new(json_path, root)
+    reporter.start
+    reporter.record(result("test_a", 1, nil, assertions: 5))
+    reporter.start
+    reporter.record(result("test_b", 2, nil, assertions: 1))
+    reporter.report
+
+    expect(JSON.parse(File.read(json_path))["summary"]).to include("example_count" => 1, "assertion_count" => 1)
+  end
+
   it "never changes the run's pass/fail verdict" do
     expect(described_class.new(json_path, root).passed?).to be(true)
   end
@@ -85,7 +107,7 @@ RSpec.describe Coatepec::TestUnit::JsonReporter do
     summary = Coatepec::Spec::Result.read_summary(json_path)
 
     expect(Coatepec::Spec::Result.summary_fields(summary))
-      .to include(example_count: 1, failure_count: 0, pending_count: 0)
+      .to include(example_count: 1, failure_count: 0, error_count: 0, pending_count: 0, assertion_count: 1)
     expect(Coatepec::Spec::Result.example_fields(summary["examples"].first))
       .to eq(id: "WidgetTest#test_a", status: "passed",
              file_path: "./test/models/widget_test.rb", line_number: 1)

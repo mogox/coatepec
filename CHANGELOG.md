@@ -101,6 +101,12 @@
   key names were a third of every item's bytes -- and both `rails_routes`
   and `rails_controller` report paths without the `(.:format)` suffix Rails
   appends to most routes.
+- `rails_spec_run`'s `summary` gains `error_count` (how many of
+  `failure_count` were errors rather than assertion failures) and
+  `assertion_count` (Minitest's assertion total), so a green run answers
+  "how many assertions ran?" without `stdout` and a failing run's counts
+  match the `0 failures, 5 errors` line beside them. Both are `null` for
+  RSpec, which reports neither.
 
 ## 0.7.0
 

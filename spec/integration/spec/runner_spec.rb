@@ -29,6 +29,7 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     expect(result["summary"]["example_count"]).to eq(1)
     expect(result["summary"]["failure_count"]).to eq(0)
     expect(result["summary"]["pending_count"]).to eq(0)
+    expect(result["summary"]).to include("error_count" => nil, "assertion_count" => nil)
     expect(result["examples"]).to eq([])
     # Regression guard: RSpec's progress-formatter output must land on the
     # child's *stdout* pipe, not leak into stderr or the protocol fd.

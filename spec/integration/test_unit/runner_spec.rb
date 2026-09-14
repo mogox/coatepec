@@ -28,7 +28,8 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
 
     expect(result["status"]).to eq("passed"), result["stderr"]
     expect(result["exit_code"]).to eq(0)
-    expect(result["summary"]).to include("example_count" => 2, "failure_count" => 0)
+    expect(result["summary"])
+      .to include("example_count" => 2, "failure_count" => 0, "error_count" => 0, "assertion_count" => 2)
     expect(result["examples"]).to eq([])
     # Rails' own reporter output lands on the child's stdout pipe.
     expect(result["stdout"]).to include("2 runs, 2 assertions, 0 failures")
@@ -69,7 +70,8 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
 
     expect(failing["status"]).to eq("failed")
     expect(failing["exit_code"]).not_to eq(0)
-    expect(failing["summary"]).to include("example_count" => 2, "failure_count" => 2)
+    expect(failing["summary"])
+      .to include("example_count" => 2, "failure_count" => 2, "error_count" => 1, "assertion_count" => 1)
     expect(failing["examples"].map { |e| e["status"] }.uniq).to eq(["failed"])
     expect(skipped["status"]).to eq("passed")
     expect(skipped["examples"].first["status"]).to eq("pending")

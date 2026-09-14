@@ -68,6 +68,8 @@ RSpec.describe "Coatepec MCP tools" do
       expect(described_class.description).to include("RSpec vocabulary")
       expect(described_class.description).to include("failure_count")
       expect(described_class.description).to include("a skip is pending")
+      expect(described_class.description).to include("error_count")
+      expect(described_class.description).to include("assertion_count")
     end
 
     it "says there is no separate Minitest tool" do
