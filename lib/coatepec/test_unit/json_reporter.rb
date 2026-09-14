@@ -6,7 +6,7 @@ require "minitest"
 module Coatepec
   module TestUnit
     # A Minitest reporter that writes the run's per-test results to a JSON
-    # file in the exact shape RSpec's own `--format json` produces, as far
+    # file in a superset of the shape RSpec's own `--format json` produces, as far
     # as Coatepec::Spec::Result reads it -- so Result and FlakyChecker need
     # no Minitest-specific code at all. Registered in the child by
     # TestUnit::Adapter#run_in_process; never loaded in the warm worker.
