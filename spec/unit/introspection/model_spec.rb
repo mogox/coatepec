@@ -78,12 +78,18 @@ RSpec.describe Coatepec::Introspection::Model do
                  :validators, :defined_enums).new("Widget", false, "widgets", "id", [], [], [], {})
     end
 
-    it "returns every section plus counts by default" do
+    it "returns counts only by default" do
       result = described_class.new("Widget").send(:build_metadata, klass)
+
+      expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts])
+      expect(result[:counts]).to eq(columns: 0, associations: 0, validators: 0, enums: 0)
+    end
+
+    it "returns every section when all four fields are requested" do
+      result = described_class.new("Widget", fields: described_class::FIELDS).send(:build_metadata, klass)
 
       expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts columns associations validators
                                    enums])
-      expect(result[:counts]).to eq(columns: 0, associations: 0, validators: 0, enums: 0)
     end
 
     it "returns only the requested sections, in canonical order, with counts for all four" do
@@ -92,6 +98,7 @@ RSpec.describe Coatepec::Introspection::Model do
       expect(result.keys).to eq(%i[name table_name primary_key abstract_class counts columns validators])
     end
 
+    # The explicit-empty case: fields: [] and an omitted fields are the same request.
     it "returns counts alone for fields: []" do
       result = described_class.new("Widget", fields: []).send(:build_metadata, klass)
 

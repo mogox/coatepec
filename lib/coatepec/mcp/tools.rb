@@ -24,7 +24,8 @@ module Coatepec
       RSPEC_VOCABULARY =
         "; results use RSpec vocabulary for both frameworks: a Minitest error is status failed and is " \
         "counted in summary.failure_count (so it can exceed the failures number Minitest prints in " \
-        "stdout) and a skip is pending"
+        "stdout; summary.error_count says how many of those were errors) and a skip is pending" \
+        "; summary.assertion_count is Minitest's assertion total, null for RSpec, as is error_count"
 
       tool_name "rails_spec_run"
       description "Run targeted RSpec examples (spec/**/*_spec.rb) or Minitest tests (test/**/*_test.rb) " \
@@ -170,17 +171,17 @@ module Coatepec
       end
     end
 
-    # The `rails_model` MCP tool: returns an ActiveRecord model's schema,
-    # associations, validators, and enums.
+    # The `rails_model` MCP tool: returns an ActiveRecord model's table
+    # metadata and list counts, plus any lists named in fields.
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
-      description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data; counts (the size of each of those four lists, each capped at 200) is always " \
-                  "present, and fields (any of columns, associations, validators, enums) limits which lists are " \
-                  "returned -- fields: [] is the cheapest way to answer a how-many question; validators are " \
-                  "de-duplicated by class, attributes and options, so the list holds distinct validators and can " \
-                  "be shorter than klass.validators; an array-valued validator option longer than 20 entries " \
-                  "keeps its first 20 with <option>_count and <option>_truncated beside it"
+      description "Return an ActiveRecord model's name, table, primary key, abstract_class and counts by default " \
+                  "(the size of its columns, associations, validators and enums lists, each capped at 200), without " \
+                  "row data; pass fields (any of columns, associations, validators, enums) to include those lists -- " \
+                  "an omitted or empty fields returns no lists, only counts; validators are de-duplicated by class, " \
+                  "attributes and options, so the list holds distinct validators and can be shorter than " \
+                  "klass.validators; an array-valued validator option longer than 20 entries keeps its first 20 with " \
+                  "<option>_count and <option>_truncated beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

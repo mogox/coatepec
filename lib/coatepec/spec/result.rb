@@ -84,11 +84,14 @@ module Coatepec
         JSON.parse(File.read(json_path))
       end
 
+      # error_count and assertion_count exist only for Minitest; RSpec's JSON has neither, so they read as nil.
       def summary_fields(summary)
         {
           example_count: summary.dig("summary", "example_count"),
           failure_count: summary.dig("summary", "failure_count"),
+          error_count: summary.dig("summary", "error_count"),
           pending_count: summary.dig("summary", "pending_count"),
+          assertion_count: summary.dig("summary", "assertion_count"),
           duration: summary.dig("summary", "duration")
         }
       end

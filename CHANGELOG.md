@@ -92,15 +92,24 @@
   `stopsig` and `coredump` only when the child did not exit normally (a
   timeout kill or a crash); a normal run reports `status`, `exit_code` and
   the output fields alongside the usual `summary` and `examples`.
-- `rails_model` always returns `counts` (the size of each of its four lists,
-  after validator de-duplication and the 200-item caps) and gains `fields`,
-  an array of `columns`/`associations`/`validators`/`enums` naming the lists
-  to return; omitted means all, `[]` means counts only.
+- `rails_model` returns `name`, `table_name`, `primary_key`, `abstract_class`
+  and `counts` (the size of each of its four lists, after validator
+  de-duplication and the 200-item caps) by default, and gains `fields`, an
+  array of `columns`/`associations`/`validators`/`enums` naming the lists to
+  include; omitted or `[]` means counts only. Callers that read the lists
+  must now ask for them -- the default response is roughly an order of
+  magnitude smaller than the full one on a typical model.
 - `rails_routes` returns `columns` (`name`, `verb`, `path`, `controller`,
   `action`, `engine`) and `rows` instead of one object per route -- the six
   key names were a third of every item's bytes -- and both `rails_routes`
   and `rails_controller` report paths without the `(.:format)` suffix Rails
   appends to most routes.
+- `rails_spec_run`'s `summary` gains `error_count` (how many of
+  `failure_count` were errors rather than assertion failures) and
+  `assertion_count` (Minitest's assertion total), so a green run answers
+  "how many assertions ran?" without `stdout` and a failing run's counts
+  match the `0 failures, 5 errors` line beside them. Both are `null` for
+  RSpec, which reports neither.
 
 ## 0.7.0
 

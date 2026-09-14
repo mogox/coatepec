@@ -96,6 +96,31 @@ RSpec.describe Coatepec::Spec::Result do
     expect(result[:summary]).to include(example_count: 1, failure_count: 0, pending_count: 1)
   end
 
+  it "passes error_count and assertion_count through when the summary has them" do
+    doc = { summary: { example_count: 2, failure_count: 1, error_count: 1, pending_count: 0, assertion_count: 7,
+                       duration: 0.1 }, examples: [] }
+    path = File.join(tmpdir, "minitest-summary.json")
+    File.write(path, JSON.generate(doc))
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+    [out_w, err_w].each(&:close)
+
+    result = described_class.build(pid: 1, status: status, out_r: out_r, err_r: err_r, json_path: path)
+
+    expect(result[:summary].keys).to eq(%i[example_count failure_count error_count pending_count assertion_count
+                                           duration])
+    expect(result[:summary]).to include(error_count: 1, assertion_count: 7)
+  ensure
+    [out_r, err_r].compact.each(&:close)
+  end
+
+  # RSpec's JSON has neither field; the keys stay so the shape is uniform and the value says "not reported".
+  it "reports error_count and assertion_count as nil when the summary lacks them" do
+    result = build([example("b", "failed")])
+
+    expect(result[:summary]).to include(error_count: nil, assertion_count: nil)
+  end
+
   it "collapses repeated failure blocks in stdout" do
     block = "Error:\nT#test_%s:\nRuntimeError: boom\n    test/t_test.rb:%d:in 'x'\n\n" \
             "bin/rails test test/t_test.rb:%d\n\n"

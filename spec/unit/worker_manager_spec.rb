@@ -88,7 +88,7 @@ RSpec.describe Coatepec::WorkerManager do
   end
 
   describe "#model" do
-    it "dispatches fields, defaulting it to nil (every section)" do
+    it "dispatches fields, defaulting it to nil (counts only)" do
       client = instance_double(Coatepec::Worker::Client, alive?: true, stop: nil, request: { name: "Widget" })
       allow(Coatepec::Worker::Client).to receive(:spawn).and_return(client)
 

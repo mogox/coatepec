@@ -14,9 +14,10 @@ module Coatepec
       MAX_OPTION_VALUES = 20
       EMPTY_TABLE_METADATA = { table_name: nil, primary_key: nil, columns: [] }.freeze
 
+      # Counts are always returned; lists are opt-in, so an omitted fields costs a few dozen bytes.
       def initialize(name, fields: nil)
         @name = name
-        @fields = validate_fields!(fields || FIELDS)
+        @fields = validate_fields!(fields || [])
       end
 
       def call
