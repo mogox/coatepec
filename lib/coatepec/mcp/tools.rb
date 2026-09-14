@@ -175,13 +175,13 @@ module Coatepec
     # associations, validators, and enums.
     class ModelTool < ::MCP::Tool
       tool_name "rails_model"
-      description "Return bounded ActiveRecord schema, associations, validators, and enums for a model, " \
-                  "without row data; counts (the size of each of those four lists, each capped at 200) is always " \
-                  "present, and fields (any of columns, associations, validators, enums) limits which lists are " \
-                  "returned -- fields: [] is the cheapest way to answer a how-many question; validators are " \
-                  "de-duplicated by class, attributes and options, so the list holds distinct validators and can " \
-                  "be shorter than klass.validators; an array-valued validator option longer than 20 entries " \
-                  "keeps its first 20 with <option>_count and <option>_truncated beside it"
+      description "Return an ActiveRecord model's name, table, primary key and counts by default (the size of its " \
+                  "columns, associations, validators and enums lists, each capped at 200), without row data; pass " \
+                  "fields (any of columns, associations, validators, enums) to include those lists -- an omitted " \
+                  "or empty fields returns no lists, only counts; validators are de-duplicated by class, " \
+                  "attributes and options, so the list holds distinct validators and can be shorter than " \
+                  "klass.validators; an array-valued validator option longer than 20 entries keeps its first 20 " \
+                  "with <option>_count and <option>_truncated beside it"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {

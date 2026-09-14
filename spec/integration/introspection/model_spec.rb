@@ -15,7 +15,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "returns Widget's real columns, association, and validator" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Widget").call
+      result = Coatepec::Introspection::Model.new("Widget", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -51,9 +51,21 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
     expect(result["enums"].first["name"]).to eq("status")
   end
 
+  it "returns counts only when fields is omitted" do
+    stdout, stderr, status = run_model_call(<<~RUBY)
+      puts JSON.generate(Coatepec::Introspection::Model.new("Widget").call)
+    RUBY
+
+    expect(status).to be_success, stderr
+    result = JSON.parse(stdout.lines.last)
+
+    expect(result.keys).to eq(%w[name table_name primary_key abstract_class counts])
+    expect(result["counts"]).to include("associations" => 2, "enums" => 1)
+  end
+
   it "keeps primitive validator options but drops non-primitive ones (e.g. Proc for if:)" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Owner").call
+      result = Coatepec::Introspection::Model.new("Owner", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -74,7 +86,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "keeps a Symbol array option (e.g. `in:`) as an array of strings" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Owner").call
+      result = Coatepec::Introspection::Model.new("Owner", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -92,7 +104,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "collapses a validation declared by both a concern and the model body into one entry" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Owner").call
+      result = Coatepec::Introspection::Model.new("Owner", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -130,7 +142,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "returns nil class_name for a real polymorphic belongs_to instead of crashing" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Note").call
+      result = Coatepec::Introspection::Model.new("Note", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -145,7 +157,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "reports nil foreign_key/class_name for a has_one :through a polymorphic belongs_to instead of crashing" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("Note").call
+      result = Coatepec::Introspection::Model.new("Note", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 
@@ -175,7 +187,7 @@ RSpec.describe Coatepec::Introspection::Model, type: :integration do
 
   it "returns empty/nil table data for an abstract class instead of crashing" do
     stdout, stderr, status = run_model_call(<<~RUBY)
-      result = Coatepec::Introspection::Model.new("ApplicationRecord").call
+      result = Coatepec::Introspection::Model.new("ApplicationRecord", fields: Coatepec::Introspection::Model::FIELDS).call
       puts JSON.generate(result)
     RUBY
 

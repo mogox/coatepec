@@ -206,6 +206,8 @@ RSpec.describe "Coatepec MCP tools" do
         .to eq(%w[columns associations validators enums])
       expect(described_class.description).to include("fields")
       expect(described_class.description).to include("counts")
+      expect(described_class.description).to include("no lists")
+      expect(described_class.description).to include("counts by default")
     end
 
     it "returns an error envelope when the worker manager raises" do

@@ -111,7 +111,7 @@ RSpec.describe "coatepec-worker executable", type: :integration do
   it "answers a model command" do
     @pid, protocol = spawn_worker
 
-    protocol.write(id: 1, command: "model", args: { name: "Widget" })
+    protocol.write(id: 1, command: "model", args: { name: "Widget", fields: %w[columns enums] })
     response = protocol.read
 
     expect(response[:ok]).to be(true)
