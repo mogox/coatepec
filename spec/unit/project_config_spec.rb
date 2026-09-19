@@ -85,4 +85,43 @@ RSpec.describe Coatepec::ProjectConfig do
     expect { described_class.new(@tmp) }
       .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_config) }
   end
+
+  it "returns {} from defaults_for when there is no file or no defaults section" do
+    expect(described_class.new(@tmp).defaults_for(:spec_run)).to eq({})
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: true\n")
+    expect(described_class.new(@tmp).defaults_for(:routes)).to eq({})
+  end
+
+  it "reads validated defaults per tool with symbol keys" do
+    File.write(File.join(@tmp, ".coatepec.yml"), <<~YAML)
+      defaults:
+        spec_run:
+          include_passing: true
+          include_stdout: always
+          timeout_seconds: 300
+        routes:
+          engines: include
+    YAML
+
+    config = described_class.new(@tmp)
+
+    expect(config.defaults_for(:spec_run)).to eq(include_passing: true, include_stdout: "always", timeout_seconds: 300)
+    expect(config.defaults_for(:routes)).to eq(engines: "include")
+  end
+
+  it "raises invalid_config naming the key for an unknown tool, an unknown key, a bad enum value and a bad range" do
+    {
+      "defaults:\n  model:\n    fields: []\n" => "model",
+      "defaults:\n  spec_run:\n    include_sdtout: never\n" => "include_sdtout",
+      "defaults:\n  spec_run:\n    include_stdout: sometimes\n" => "include_stdout",
+      "defaults:\n  spec_run:\n    timeout_seconds: 901\n" => "timeout_seconds",
+      "defaults:\n  spec_run:\n    include_passing: yes please\n" => "include_passing",
+      "defaults: nope\n" => "defaults"
+    }.each do |yaml, key|
+      File.write(File.join(@tmp, ".coatepec.yml"), yaml)
+
+      expect { described_class.new(@tmp) }
+        .to raise_error(Coatepec::Error, a_string_including(key)) { |e| expect(e.code).to eq(:invalid_config) }
+    end
+  end
 end

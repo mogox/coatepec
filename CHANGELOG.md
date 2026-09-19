@@ -15,6 +15,12 @@
   nine runs. `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` is now a
   recommendation for projects that see `spawn_after_crash`, not a
   requirement.
+- `.coatepec.yml` gains a `defaults` map: `spec_run.include_passing`,
+  `spec_run.include_stdout`, `spec_run.timeout_seconds` and `routes.engines`
+  set project-wide defaults for those inputs. A call argument always wins;
+  an omitted key means the built-in default; an unknown key or an
+  out-of-range value fails the call with `invalid_config` naming it. The
+  file is re-read on every call.
 
 ## 0.8.0
 

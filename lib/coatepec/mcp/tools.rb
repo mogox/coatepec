@@ -33,18 +33,21 @@ module Coatepec
                   "paths; there is no separate Minitest tool#{RSPEC_VOCABULARY}" \
                   "; returns only failed and pending examples unless include_passing is true" \
                   "; failure blocks in stdout that repeat an earlier error are rolled up into one line" \
-                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\""
+                  "; stdout is returned only for failing runs unless include_stdout is \"always\" or \"never\"" \
+                  "; defaults for include_passing, include_stdout and timeout_seconds can be set project-wide " \
+                  "in .coatepec.yml"
       annotations(read_only_hint: false, destructive_hint: true, idempotent_hint: false, open_world_hint: true)
       input_schema(**INPUT_SCHEMA)
 
       class << self
-        def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: 120,
-                 include_passing: false, include_stdout: "failures")
+        def call(paths:, server_context:, example: nil, seed: nil, fail_fast: false, timeout_seconds: nil,
+                 include_passing: nil, include_stdout: nil)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].run_spec(
-            paths: paths, example: example, seed: seed, fail_fast: fail_fast, timeout_seconds: timeout_seconds,
-            include_passing: include_passing, include_stdout: include_stdout
-          )
+          inputs = Defaults.resolve(:spec_run, server_context[:project_root], timeout_seconds: timeout_seconds,
+                                                                              include_passing: include_passing,
+                                                                              include_stdout: include_stdout)
+          data = server_context[:worker_manager].run_spec(paths: paths, example: example, seed: seed,
+                                                          fail_fast: fail_fast, **inputs)
           Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)
@@ -147,7 +150,8 @@ module Coatepec
                   "engine field (null for an application route; query also matches that field); returns columns " \
                   "(name, verb, path, controller, action, engine) and up to limit rows (default 100) in that " \
                   "order, paths without the (.:format) suffix Rails appends, with next_offset -- the offset to " \
-                  "pass back for the next page, null on the last one"
+                  "pass back for the next page, null on the last one" \
+                  "; the engines default can be set project-wide in .coatepec.yml"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(
         properties: {
@@ -161,9 +165,10 @@ module Coatepec
       )
 
       class << self
-        def call(server_context:, query: nil, limit: 100, offset: 0, engines: Introspection::Routes::DEFAULT_ENGINES)
+        def call(server_context:, query: nil, limit: 100, offset: 0, engines: nil)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, engines: engines)
+          inputs = Defaults.resolve(:routes, server_context[:project_root], engines: engines)
+          data = server_context[:worker_manager].routes(query: query, limit: limit, offset: offset, **inputs)
           Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)

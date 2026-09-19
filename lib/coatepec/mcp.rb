@@ -9,6 +9,7 @@ end
 
 require "coatepec"
 require_relative "mcp/response"
+require_relative "mcp/defaults"
 require_relative "mcp/tools"
 
 module Coatepec

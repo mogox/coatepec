@@ -5,6 +5,7 @@ require "coatepec/mcp"
 
 RSpec.describe "Coatepec MCP tools" do
   let(:worker_manager) { instance_double(Coatepec::WorkerManager) }
+  # /app does not exist, so ProjectConfig finds no file and every default is the built-in.
   let(:server_context) { { worker_manager: worker_manager, project_root: "/app" } }
 
   describe Coatepec::MCP::SpecRunTool do
@@ -74,6 +75,22 @@ RSpec.describe "Coatepec MCP tools" do
 
     it "says there is no separate Minitest tool" do
       expect(described_class.description).to include("no separate Minitest tool")
+    end
+
+    it "fills omitted inputs from the project config before calling the worker manager" do
+      config = instance_double(Coatepec::ProjectConfig)
+      allow(config).to receive(:defaults_for).with(:spec_run).and_return(include_stdout: "always", timeout_seconds: 300)
+      allow(Coatepec::ProjectConfig).to receive(:new).with("/app").and_return(config)
+      allow(worker_manager).to receive(:run_spec).and_return(status: "passed")
+
+      described_class.call(paths: ["spec/x_spec.rb"], include_passing: true, server_context: server_context)
+
+      expect(worker_manager).to have_received(:run_spec)
+        .with(hash_including(include_passing: true, include_stdout: "always", timeout_seconds: 300))
+    end
+
+    it "says defaults can come from .coatepec.yml" do
+      expect(described_class.description).to include(".coatepec.yml")
     end
   end
 
@@ -176,6 +193,22 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(true)
       expect(payload["error"]["code"]).to eq("worker_disconnected")
+    end
+
+    it "fills an omitted engines from the project config before calling the worker manager" do
+      config = instance_double(Coatepec::ProjectConfig)
+      allow(config).to receive(:defaults_for).with(:routes).and_return(engines: "include")
+      allow(Coatepec::ProjectConfig).to receive(:new).with("/app").and_return(config)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
+
+      described_class.call(server_context: server_context)
+
+      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "include"))
+    end
+
+    it "says the engines default can come from .coatepec.yml" do
+      expect(described_class.description).to include(".coatepec.yml")
     end
   end
 
