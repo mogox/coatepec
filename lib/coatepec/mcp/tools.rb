@@ -56,21 +56,28 @@ module Coatepec
     end
 
     # The `rails_runtime_status` MCP tool: reports the test worker's
-    # Ruby/Rails versions, PID, boot_id, lifecycle state and the project
-    # root. Worker::Server#handle boots the Rails runtime before dispatching
-    # any command, so the first call to this tool starts (and blocks on) a
-    # full Rails boot just like a spec run.
+    # Ruby/Rails versions, PID, boot_id, lifecycle state, the spec strategy
+    # and its fallback count, the project root and the effective tool
+    # defaults. Worker::Server#handle boots the Rails runtime before
+    # dispatching any command, so the first call to this tool starts (and
+    # blocks on) a full Rails boot just like a spec run.
     class RuntimeStatusTool < ::MCP::Tool
       tool_name "rails_runtime_status"
-      description "Report the Coatepec test worker's identity and boot status " \
-                  "(boots the warm worker if it is not up yet); includes the project root as project_root"
+      description "Report the Coatepec test worker's identity and boot status (boots the warm worker if it is " \
+                  "not up yet); includes project_root, spec_strategy (fork, guarded_fork or spawn), fallbacks " \
+                  "(how many guarded-fork runs fell back to spawn; null unless guarded_fork) and defaults (the " \
+                  "effective rails_spec_run and rails_routes defaults after .coatepec.yml)"
       annotations(read_only_hint: true, destructive_hint: false, idempotent_hint: true, open_world_hint: false)
       input_schema(properties: {}, required: [], additionalProperties: false)
 
       class << self
         def call(server_context:)
           started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          data = server_context[:worker_manager].status.merge(project_root: server_context[:project_root])
+          root = server_context[:project_root]
+          data = server_context[:worker_manager].status.merge(
+            project_root: root,
+            defaults: { spec_run: Defaults.resolve(:spec_run, root), routes: Defaults.resolve(:routes, root) }
+          )
           Response.ok(data: data, meta: Response.meta(started_at))
         rescue Coatepec::Error => e
           Response.error(e)

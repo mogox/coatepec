@@ -21,6 +21,13 @@
   an omitted key means the built-in default; an unknown key or an
   out-of-range value fails the call with `invalid_config` naming it. The
   file is re-read on every call.
+- `rails_runtime_status` reports `spec_strategy` (`fork`, `guarded_fork` or
+  `spawn`), `fallbacks` (how many guarded-fork runs fell back to spawn in
+  this worker's lifetime; `null` unless the guarded fork is in use) and
+  `defaults` (the effective `rails_spec_run` and `rails_routes` defaults
+  after `.coatepec.yml`), so an agent can see every default in one call.
+  `fallbacks` also counts `rails_spec_flaky_check` rounds, which run through
+  the same strategy.
 
 ## 0.8.0
 

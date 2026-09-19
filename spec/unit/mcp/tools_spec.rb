@@ -96,16 +96,30 @@ RSpec.describe "Coatepec MCP tools" do
 
   describe Coatepec::MCP::RuntimeStatusTool do
     it "returns an ok envelope with the worker status" do
-      allow(worker_manager).to receive(:status).and_return(environment: "test")
+      allow(worker_manager).to receive(:status)
+        .and_return(environment: "test", spec_strategy: "guarded_fork", fallbacks: 0)
 
       response = described_class.call(server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
-      expect(payload["data"]).to eq("environment" => "test", "project_root" => "/app")
+      expect(payload["data"]).to eq(
+        "environment" => "test", "spec_strategy" => "guarded_fork", "fallbacks" => 0, "project_root" => "/app",
+        "defaults" => {
+          "spec_run" => { "include_passing" => false, "include_stdout" => "failures", "timeout_seconds" => 120 },
+          "routes" => { "engines" => "exclude" }
+        }
+      )
+      expect(payload["data"].keys.last(2)).to eq(%w[project_root defaults])
     end
 
     it "documents project_root" do
       expect(described_class.description).to include("project_root")
+    end
+
+    it "documents spec_strategy, fallbacks and defaults" do
+      expect(described_class.description).to include("spec_strategy")
+      expect(described_class.description).to include("fallbacks")
+      expect(described_class.description).to include("defaults")
     end
   end
 

@@ -79,4 +79,18 @@ RSpec.describe Coatepec::Spec::Runner do
       expect(runner.strategy_name).to eq("guarded_fork")
     end
   end
+
+  describe "#run" do
+    it "reports the strategy's execution_mode to the rails runtime" do
+      allow(RbConfig::CONFIG).to receive(:[]).and_call_original
+      allow(RbConfig::CONFIG).to receive(:[]).with("host_os").and_return("linux-gnu")
+      strategy = instance_double(Coatepec::Spec::ForkStrategy, run: { status: "passed", execution_mode: "fork" })
+      allow(Coatepec::Spec::ForkStrategy).to receive(:new).and_return(strategy)
+      rails_runtime = instance_double(Coatepec::Worker::RailsRuntime, record_execution_mode: nil)
+
+      described_class.new(FIXTURE_APP_ROOT, rails_runtime: rails_runtime).run(paths: ["spec/passing_spec.rb"])
+
+      expect(rails_runtime).to have_received(:record_execution_mode).with("fork")
+    end
+  end
 end

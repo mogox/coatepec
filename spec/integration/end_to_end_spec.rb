@@ -35,6 +35,8 @@ RSpec.describe "coatepec end-to-end", type: :integration do
       status_payload = JSON.parse(status_response["result"]["content"].first["text"])
       expect(status_payload["data"]["environment"]).to eq("test")
       expect(status_payload["data"]["project_root"]).to eq(FIXTURE_APP_ROOT)
+      expect(status_payload["data"]["defaults"]["routes"]).to eq("engines" => "exclude")
+      expect(status_payload["data"].keys.last(2)).to eq(%w[project_root defaults])
 
       send_request(stdin, 3, "tools/call", { name: "rails_spec_run", arguments: { paths: ["spec/passing_spec.rb"] } })
       spec_response = read_response(stdout)

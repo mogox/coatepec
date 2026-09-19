@@ -24,8 +24,11 @@ module Coatepec
         adapter.require_framework!
         args = adapter.build_args(validated[:selectors], example, seed, fail_fast)
 
-        strategy_class.new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
-                      .run(args, timeout_seconds, include_passing: include_passing, include_stdout: include_stdout)
+        result = strategy_class
+                 .new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
+                 .run(args, timeout_seconds, include_passing: include_passing, include_stdout: include_stdout)
+        @rails_runtime&.record_execution_mode(result[:execution_mode])
+        result
       end
 
       # Reported by rails_runtime_status so a caller can see which path a run will take.

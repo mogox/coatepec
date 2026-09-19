@@ -46,6 +46,8 @@ RSpec.describe "coatepec-worker executable", type: :integration do
     expect(response[:ok]).to be(true)
     expect(response[:data][:rails_version]).to match(/\A(7\.1|8\.1)\./)
     expect(response[:data][:environment]).to eq("test")
+    expect(%w[fork guarded_fork spawn]).to include(response[:data][:spec_strategy])
+    expect(response[:data]).to have_key(:fallbacks)
   end
 
   it "answers a spec_run command" do
