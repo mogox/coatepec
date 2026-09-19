@@ -176,6 +176,18 @@ a no-op.
   routes mounted from it. Application routes always sort before engine routes,
   so an unfiltered listing (with `engines: "include"`) reads the way
   `bin/rails routes` does.
+- `engines_excluded` is a correctness signal, not only a saving. Engine
+  routes print their paths relative to the mount point, so
+  `bin/rails routes -g admin` cannot find an admin engine's routes at all: it
+  matches the mount line and answers "one admin route" with no hint that
+  anything is missing. `rails_routes(query: "admin")` returns that one row
+  plus `engines_excluded: 243`, so the reader knows the rest exists.
+- Opting in is the expensive path, and it paginates. A broad query with
+  `engines: "include"` on an app with a mounted admin engine costs several
+  times the default response and can still stop at the 100-row page of a
+  larger match (`next_offset` says so), where the default returned the
+  application's routes complete. Reach for `engines: "only"` with the
+  engine's class name when the engine's routes are the question.
 - An engine route's `name` is relative to its engine, not a top-level url
   helper: the row `["audits", "GET", "/widget_admin/audits",
   "widget_admin/audits", "index", "WidgetAdmin::Engine"]` is reached as
