@@ -11,8 +11,9 @@ module Coatepec
       @data = load(root)
     end
 
+    # Forking is the macOS default since 0.9.0; `macos_fork: false` opts a project out.
     def macos_fork?
-      !!@data["macos_fork"]
+      @data.fetch("macos_fork", true) ? true : false
     end
 
     def macos_fork_unsafe_gems

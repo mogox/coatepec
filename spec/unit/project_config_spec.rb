@@ -12,10 +12,10 @@ RSpec.describe Coatepec::ProjectConfig do
     end
   end
 
-  it "defaults macos_fork? to false and macos_fork_unsafe_gems to [] when there is no config file" do
+  it "defaults macos_fork? to true and macos_fork_unsafe_gems to [] when there is no config file" do
     config = described_class.new(@tmp)
 
-    expect(config.macos_fork?).to be(false)
+    expect(config.macos_fork?).to be(true)
     expect(config.macos_fork_unsafe_gems).to eq([])
   end
 
@@ -27,6 +27,18 @@ RSpec.describe Coatepec::ProjectConfig do
 
   it "reads macos_fork: false from .coatepec.yml" do
     File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: false\n")
+
+    expect(described_class.new(@tmp).macos_fork?).to be(false)
+  end
+
+  it "treats a non-boolean macos_fork as its truthiness" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: maybe\n")
+
+    expect(described_class.new(@tmp).macos_fork?).to be(true)
+  end
+
+  it "treats an empty macos_fork value as opting out" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork:\n")
 
     expect(described_class.new(@tmp).macos_fork?).to be(false)
   end

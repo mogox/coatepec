@@ -58,8 +58,8 @@ MCP client
 Coatepec parent (Rails-free)
     `-- private NDJSON --> test worker (Rails "test", booted lazily, kept warm)
                               |-- Linux:  Process.fork  --> isolated RSpec/Minitest child
-                              `-- macOS:  Process.spawn --> fresh RSpec/Minitest process (default)
-                                          Process.fork, guarded --> opt-in, see Configuration
+                              `-- macOS:  Process.fork, guarded --> isolated RSpec/Minitest child (default)
+                                          Process.spawn --> fresh process, see Configuration (macos_fork: false)
 ```
 
 ## Configuration
@@ -68,7 +68,7 @@ An optional `.coatepec.yml` at the target Rails app's root enables
 per-project settings:
 
 ```yaml
-macos_fork: true                     # opt into forking on macOS (see below)
+macos_fork: false                    # opt out of forking on macOS (default true; see below)
 macos_fork_unsafe_gems: [some_gem]   # extends the built-in fork-unsafe denylist
 ```
 
@@ -80,16 +80,16 @@ it. Set `COATEPEC_PRETTY=1` in the MCP server's `env` (the same place as
 `OBJC_DISABLE_INITIALIZE_FORK_SAFETY` in the JSON example below) to
 pretty-print them when you are reading the sidecar by hand.
 
-### macOS fork (experimental, opt-in)
+### macOS fork (default since 0.9.0)
 
-On macOS, `rails_spec_run` normally spawns a fresh `bundle exec rspec`
-process per call, re-booting Rails every time -- the warm-worker speedup
-described above only applies on Linux by default. Setting `macos_fork:
-true` lets Coatepec attempt `Process.fork` on macOS too, reusing the warm
-boot the way Linux does.
+On macOS, `rails_spec_run` forks the warm worker for each call, reusing the
+boot the way it always has on Linux. Setting `macos_fork: false` in
+`.coatepec.yml` opts the project out: every call then spawns a fresh
+`bundle exec rspec` process and re-boots Rails, so only the Linux lane
+gets the warm-worker speedup described above.
 
-This is opt-in because forking a process with native extensions loaded
-isn't universally safe. Before each fork, Coatepec checks the worker's
+The fork is guarded, because forking a process with native extensions
+loaded isn't universally safe. Before each fork, Coatepec checks the worker's
 live thread count against its post-boot baseline and its loaded gems
 against a denylist, falling back to a fresh spawn for that one call if
 either check looks risky. The built-in denylist ships empty -- no single
@@ -103,12 +103,12 @@ or `spawn_after_crash`) so you can see which path actually ran for a given
 call; `spawn_after_crash` results also carry the crashed fork's own stderr
 under `crashed_fork_stderr` so the crash can be diagnosed.
 
-`macos_fork: true` also effectively requires
-`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` in Coatepec's own environment.
-Without it, a forked child that touches an Objective-C-initialized class
-aborts -- Coatepec retries via spawn, so it degrades silently to the slow
-path (no crash, no error surfaced) rather than failing loudly, and you
-simply never get the speedup. Set it on the MCP server process itself:
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` in Coatepec's own environment is
+recommended if you ever see `spawn_after_crash`. Without it, a forked child
+that touches an Objective-C-initialized class aborts -- Coatepec retries via
+spawn, so it degrades to the slow path for that call (no crash, no error
+surfaced) rather than failing loudly, and you simply never get the speedup.
+Set it on the MCP server process itself:
 
 ```json
 {
@@ -369,7 +369,7 @@ structure without ever handing it a REPL.
 Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`, Minitest 5.x and 6.x (the fixture
 apps pin 6.0.6; the 5.x name-filter flag is unit-tested). CI tests three
 lanes: Rails 8.1 on Linux (primary), Rails 7.1 on Linux (compat), and Rails
-8.1 on macOS (which is where the guarded-fork path above actually forks).
+8.1 on macOS (the lane that exercises the guarded-fork path above).
 
 ## Development
 

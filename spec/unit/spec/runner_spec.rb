@@ -36,10 +36,10 @@ RSpec.describe Coatepec::Spec::Runner do
       expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::ForkStrategy)
     end
 
-    it "spawns on macOS" do
+    it "uses GuardedForkStrategy on macOS by default" do
       stub_host_os("darwin24")
 
-      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::GuardedForkStrategy)
     end
 
     it "raises unsupported_platform on Windows" do
@@ -60,10 +60,23 @@ RSpec.describe Coatepec::Spec::Runner do
       end
     end
 
-    it "still uses SpawnStrategy on macOS when .coatepec.yml is absent" do
+    it "uses SpawnStrategy on macOS when .coatepec.yml sets macos_fork: false" do
       stub_host_os("darwin24")
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "Gemfile"), "source 'https://rubygems.org'\n")
+        File.write(File.join(dir, ".coatepec.yml"), "macos_fork: false\n")
+        configured_runner = described_class.new(dir)
 
-      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+        expect(configured_runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+      end
+    end
+
+    it "names the strategy it would pick" do
+      stub_host_os("linux-gnu")
+      expect(runner.strategy_name).to eq("fork")
+
+      stub_host_os("darwin24")
+      expect(runner.strategy_name).to eq("guarded_fork")
     end
   end
 end
