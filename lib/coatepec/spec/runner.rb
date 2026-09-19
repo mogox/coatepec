@@ -58,8 +58,8 @@ module Coatepec
         end
       end
 
-      # Forking is the default; only an explicit `macos_fork: false` spawns. Reading
-      # the config here still raises :invalid_config on macOS only -- accepted asymmetry.
+      # Forking is the default; only an explicit `macos_fork: false` spawns. Only the macOS
+      # branch reads the file here; the MCP layer reads it on every call for `defaults`.
       def macos_strategy_class
         @project.config.macos_fork? ? GuardedForkStrategy : SpawnStrategy
       end

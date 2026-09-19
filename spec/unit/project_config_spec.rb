@@ -2,6 +2,7 @@
 
 require "spec_helper"
 require "coatepec/project_config"
+require "coatepec/mcp"
 require "tmpdir"
 
 RSpec.describe Coatepec::ProjectConfig do
@@ -122,6 +123,22 @@ RSpec.describe Coatepec::ProjectConfig do
 
       expect { described_class.new(@tmp) }
         .to raise_error(Coatepec::Error, a_string_including(key)) { |e| expect(e.code).to eq(:invalid_config) }
+    end
+  end
+
+  # DEFAULT_KEYS must accept exactly what the MCP schemas accept, and name exactly what Defaults resolves.
+  it "mirrors the tool input schemas and the built-in defaults table" do
+    spec_run = Coatepec::MCP::SpecRunTool::INPUT_SCHEMA[:properties]
+    routes = Coatepec::MCP::RoutesTool.input_schema.to_h[:properties]
+    keys = described_class::DEFAULT_KEYS
+
+    expect(keys["spec_run"]["include_stdout"][:enum]).to eq(spec_run[:include_stdout][:enum])
+    expect(keys["spec_run"]["timeout_seconds"][:range])
+      .to eq(spec_run[:timeout_seconds][:minimum]..spec_run[:timeout_seconds][:maximum])
+    expect(spec_run[:include_passing][:type]).to eq("boolean")
+    expect(keys["routes"]["engines"][:enum]).to eq(routes[:engines][:enum])
+    keys.each do |tool, rules|
+      expect(rules.keys.map(&:to_sym)).to eq(Coatepec::MCP::Defaults::BUILTIN.fetch(tool.to_sym).keys)
     end
   end
 end

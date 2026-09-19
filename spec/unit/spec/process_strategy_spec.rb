@@ -68,7 +68,8 @@ RSpec.describe Coatepec::Spec::ProcessStrategy do
         end
       end
 
-      expect { bare.new(Dir.pwd).run(["spec/passing_spec.rb"], 5) }.to raise_error(NotImplementedError)
+      expect { bare.new(Dir.pwd).run(["spec/passing_spec.rb"], 5) }
+        .to raise_error(NotImplementedError, /execution_mode/)
     end
   end
 end

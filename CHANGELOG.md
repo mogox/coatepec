@@ -7,14 +7,14 @@
   `spawn_fallback` (the guard declined to fork) or `spawn_after_crash` (the
   forked child crashed and the run was retried). The key used to appear
   only when the guarded fork was in play.
-- `rails_spec_run` forks the warm worker on macOS by default, the way it
-  always has on Linux, using the guarded fork shipped in 0.7.0 (thread-count
-  and gem-denylist checks, a spawn retry if the child crashes). Set
-  `macos_fork: false` in `.coatepec.yml` to keep a fresh spawn per call.
-  Measured on a Rails 8.2 app: 966 ms saved per run, no fallbacks across
-  nine runs. `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` is now a
-  recommendation for projects that see `spawn_after_crash`, not a
-  requirement.
+- Behaviour change on macOS: projects that never set `macos_fork: true` now
+  fork the warm worker by default, the way it always has on Linux, using
+  the guarded fork shipped in 0.7.0 (thread-count and gem-denylist checks,
+  a spawn retry if the child crashes). Set `macos_fork: false` in
+  `.coatepec.yml` to keep a fresh spawn per call. Measured on a Rails
+  8.2.0.alpha app: 966 ms saved per run, no fallbacks across nine runs.
+  `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` is now a recommendation for
+  projects that see `spawn_after_crash`, not a requirement.
 - `.coatepec.yml` gains a `defaults` map: `spec_run.include_passing`,
   `spec_run.include_stdout`, `spec_run.timeout_seconds` and `routes.engines`
   set project-wide defaults for those inputs. A call argument always wins;
