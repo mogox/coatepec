@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+- `rails_spec_run` results always carry `execution_mode`: `fork` (Linux, or
+  a macOS guarded fork that ran), `spawn` (macOS with `macos_fork: false`),
+  `spawn_fallback` (the guard declined to fork) or `spawn_after_crash` (the
+  forked child crashed and the run was retried). The key used to appear
+  only when the guarded fork was in play.
+
 ## 0.8.0
 
 - Tool responses are now compact JSON rather than pretty-printed (22-32%

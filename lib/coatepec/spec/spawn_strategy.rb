@@ -9,6 +9,8 @@ module Coatepec
     class SpawnStrategy < ProcessStrategy
       private
 
+      def execution_mode = "spawn"
+
       def start(full_args, out_w, err_w, json_path)
         env, argv = @adapter.spawn_command(full_args, json_path)
         Process.spawn(env, *argv, chdir: @project_root, out: out_w, err: err_w, pgroup: true)

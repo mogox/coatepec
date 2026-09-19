@@ -33,6 +33,7 @@ RSpec.describe "Coatepec::Spec::Runner with Minitest selectors", type: :integrat
     expect(result["examples"]).to eq([])
     # Rails' own reporter output lands on the child's stdout pipe.
     expect(result["stdout"]).to include("2 runs, 2 assertions, 0 failures")
+    expect(%w[fork spawn spawn_fallback spawn_after_crash]).to include(result["execution_mode"])
 
     with_passing = run_runner('paths: ["test/models/passing_test.rb"], include_passing: true')
 

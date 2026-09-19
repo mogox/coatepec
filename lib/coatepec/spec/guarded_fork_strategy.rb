@@ -56,7 +56,7 @@ module Coatepec
           # that plain SpawnStrategy wouldn't have.
           return fallback_result(args, timeout_seconds, "spawn_fallback", result_options)
         end
-        return result.merge(execution_mode: "fork") unless crashed?(result)
+        return result unless crashed?(result)
 
         retry_after_crash(args, timeout_seconds, started_at, result, result_options)
       end
