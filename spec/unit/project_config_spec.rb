@@ -2,6 +2,7 @@
 
 require "spec_helper"
 require "coatepec/project_config"
+require "coatepec/mcp"
 require "tmpdir"
 
 RSpec.describe Coatepec::ProjectConfig do
@@ -12,10 +13,10 @@ RSpec.describe Coatepec::ProjectConfig do
     end
   end
 
-  it "defaults macos_fork? to false and macos_fork_unsafe_gems to [] when there is no config file" do
+  it "defaults macos_fork? to true and macos_fork_unsafe_gems to [] when there is no config file" do
     config = described_class.new(@tmp)
 
-    expect(config.macos_fork?).to be(false)
+    expect(config.macos_fork?).to be(true)
     expect(config.macos_fork_unsafe_gems).to eq([])
   end
 
@@ -27,6 +28,18 @@ RSpec.describe Coatepec::ProjectConfig do
 
   it "reads macos_fork: false from .coatepec.yml" do
     File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: false\n")
+
+    expect(described_class.new(@tmp).macos_fork?).to be(false)
+  end
+
+  it "treats a non-boolean macos_fork as its truthiness" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: maybe\n")
+
+    expect(described_class.new(@tmp).macos_fork?).to be(true)
+  end
+
+  it "treats an empty macos_fork value as opting out" do
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork:\n")
 
     expect(described_class.new(@tmp).macos_fork?).to be(false)
   end
@@ -72,5 +85,60 @@ RSpec.describe Coatepec::ProjectConfig do
 
     expect { described_class.new(@tmp) }
       .to raise_error(Coatepec::Error) { |e| expect(e.code).to eq(:invalid_config) }
+  end
+
+  it "returns {} from defaults_for when there is no file or no defaults section" do
+    expect(described_class.new(@tmp).defaults_for(:spec_run)).to eq({})
+    File.write(File.join(@tmp, ".coatepec.yml"), "macos_fork: true\n")
+    expect(described_class.new(@tmp).defaults_for(:routes)).to eq({})
+  end
+
+  it "reads validated defaults per tool with symbol keys" do
+    File.write(File.join(@tmp, ".coatepec.yml"), <<~YAML)
+      defaults:
+        spec_run:
+          include_passing: true
+          include_stdout: always
+          timeout_seconds: 300
+        routes:
+          engines: include
+    YAML
+
+    config = described_class.new(@tmp)
+
+    expect(config.defaults_for(:spec_run)).to eq(include_passing: true, include_stdout: "always", timeout_seconds: 300)
+    expect(config.defaults_for(:routes)).to eq(engines: "include")
+  end
+
+  it "raises invalid_config naming the key for an unknown tool, an unknown key, a bad enum value and a bad range" do
+    {
+      "defaults:\n  model:\n    fields: []\n" => "model",
+      "defaults:\n  spec_run:\n    include_sdtout: never\n" => "include_sdtout",
+      "defaults:\n  spec_run:\n    include_stdout: sometimes\n" => "include_stdout",
+      "defaults:\n  spec_run:\n    timeout_seconds: 901\n" => "timeout_seconds",
+      "defaults:\n  spec_run:\n    include_passing: yes please\n" => "include_passing",
+      "defaults: nope\n" => "defaults"
+    }.each do |yaml, key|
+      File.write(File.join(@tmp, ".coatepec.yml"), yaml)
+
+      expect { described_class.new(@tmp) }
+        .to raise_error(Coatepec::Error, a_string_including(key)) { |e| expect(e.code).to eq(:invalid_config) }
+    end
+  end
+
+  # DEFAULT_KEYS must accept exactly what the MCP schemas accept, and name exactly what Defaults resolves.
+  it "mirrors the tool input schemas and the built-in defaults table" do
+    spec_run = Coatepec::MCP::SpecRunTool::INPUT_SCHEMA[:properties]
+    routes = Coatepec::MCP::RoutesTool.input_schema.to_h[:properties]
+    keys = described_class::DEFAULT_KEYS
+
+    expect(keys["spec_run"]["include_stdout"][:enum]).to eq(spec_run[:include_stdout][:enum])
+    expect(keys["spec_run"]["timeout_seconds"][:range])
+      .to eq(spec_run[:timeout_seconds][:minimum]..spec_run[:timeout_seconds][:maximum])
+    expect(spec_run[:include_passing][:type]).to eq("boolean")
+    expect(keys["routes"]["engines"][:enum]).to eq(routes[:engines][:enum])
+    keys.each do |tool, rules|
+      expect(rules.keys.map(&:to_sym)).to eq(Coatepec::MCP::Defaults::BUILTIN.fetch(tool.to_sym).keys)
+    end
   end
 end

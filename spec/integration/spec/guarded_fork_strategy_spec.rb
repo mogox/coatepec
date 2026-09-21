@@ -185,9 +185,6 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy, type: :integration do
     # the specs that share this fixture.
     let(:config_path) { File.join(FIXTURE_APP_ROOT, ".coatepec.yml") }
 
-    before { File.write(config_path, "macos_fork: true\n") }
-    after { FileUtils.rm_f(config_path) }
-
     it "reports execution_mode fork through a real NDJSON spec_run round-trip" do
       stdout, stderr, status = run_in_fixture_app(<<~RUBY)
         $LOAD_PATH.unshift(#{File.expand_path("../../../lib", __dir__).inspect})
@@ -224,6 +221,49 @@ RSpec.describe Coatepec::Spec::GuardedForkStrategy, type: :integration do
       expect(response["ok"]).to be(true), stdout
       expect(response["data"]["status"]).to eq("passed")
       expect(response["data"]["execution_mode"]).to eq("fork")
+    end
+
+    context "when the project opts out with macos_fork: false" do
+      before { File.write(config_path, "macos_fork: false\n") }
+      after { FileUtils.rm_f(config_path) }
+
+      it "reports execution_mode spawn through the same round-trip" do
+        stdout, stderr, status = run_in_fixture_app(<<~RUBY)
+          $LOAD_PATH.unshift(#{File.expand_path("../../../lib", __dir__).inspect})
+          require "coatepec"
+
+          # Plain assignment, not an RSpec stub: this runs in a spawned
+          # subprocess with no rspec-mocks session. RbConfig::CONFIG is a
+          # mutable Hash, so this is all a darwin gate ever reads.
+          RbConfig::CONFIG["host_os"] = "darwin24"
+
+          to_server_r, to_server_w = IO.pipe
+          from_server_r, from_server_w = IO.pipe
+          client = Coatepec::Protocol.new(input: from_server_r, output: to_server_w)
+
+          client.write(id: 1, command: "spec_run", args: { paths: ["spec/passing_spec.rb"] })
+          to_server_w.close
+
+          # Reads concurrently so a response larger than the pipe buffer can't
+          # deadlock the server; started before boot! so RailsRuntime's
+          # post-boot thread baseline counts it and the guard still passes.
+          response = nil
+          reader = Thread.new { response = client.read }
+
+          Coatepec::Worker::Server.new(#{FIXTURE_APP_ROOT.inspect}, input: to_server_r, protocol_output: from_server_w).run
+          from_server_w.close
+          reader.join
+
+          puts JSON.generate(response)
+        RUBY
+
+        expect(status).to be_success, stderr
+        response = JSON.parse(stdout.lines.last)
+
+        expect(response["ok"]).to be(true), stdout
+        expect(response["data"]["status"]).to eq("passed")
+        expect(response["data"]["execution_mode"]).to eq("spawn")
+      end
     end
   end
 end

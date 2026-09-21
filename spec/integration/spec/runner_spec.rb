@@ -35,6 +35,7 @@ RSpec.describe Coatepec::Spec::Runner, type: :integration do
     # child's *stdout* pipe, not leak into stderr or the protocol fd.
     expect(result["stdout"]).to include("1 example, 0 failures")
     expect(result["stdout_truncated"]).to be(false)
+    expect(%w[fork spawn spawn_fallback spawn_after_crash]).to include(result["execution_mode"])
   end
 
   it "returns stdout as null for a passing run by default" do

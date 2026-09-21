@@ -8,6 +8,8 @@ module Coatepec
     class ForkStrategy < ProcessStrategy
       private
 
+      def execution_mode = "fork"
+
       def start(full_args, out_w, err_w, json_path)
         Process.fork do
           Process.setpgid(0, 0)

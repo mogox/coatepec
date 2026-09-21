@@ -29,9 +29,15 @@ module Coatepec
 
         reap(pid, [out_r, err_r], timeout_seconds, json_path,
              { include_passing: include_passing, include_stdout: include_stdout })
+          .merge(execution_mode: execution_mode)
       end
 
       private
+
+      # Every result says how it ran, so an absent key can never be mistaken for "the guard fell back".
+      def execution_mode
+        raise NotImplementedError, "#{self.class} must implement #execution_mode"
+      end
 
       # Subclasses start a process and return its pid; the test framework's
       # own output must be wired to out_w/err_w. json_path is where the

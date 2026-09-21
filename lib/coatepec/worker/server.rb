@@ -40,7 +40,7 @@ module Coatepec
 
       def execute_command(command, args)
         case command
-        when "status" then @runtime.status
+        when "status" then handle_status
         when "spec_run" then handle_spec_run(args)
         when "flaky_check" then handle_flaky_check(args)
         when "routes" then handle_routes(args)
@@ -49,6 +49,12 @@ module Coatepec
         else
           raise Coatepec::Error.new(:internal_error, "Unknown command #{command}")
         end
+      end
+
+      # spec_strategy and fallbacks are the worker's to report: it owns the platform check and the counter.
+      def handle_status
+        name = Spec::Runner.new(@project_root, rails_runtime: @runtime).strategy_name
+        @runtime.status.merge(spec_strategy: name, fallbacks: name == "guarded_fork" ? @runtime.fallback_count : nil)
       end
 
       def handle_spec_run(args)

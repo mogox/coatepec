@@ -5,6 +5,7 @@ require "coatepec/mcp"
 
 RSpec.describe "Coatepec MCP tools" do
   let(:worker_manager) { instance_double(Coatepec::WorkerManager) }
+  # /app does not exist, so ProjectConfig finds no file and every default is the built-in.
   let(:server_context) { { worker_manager: worker_manager, project_root: "/app" } }
 
   describe Coatepec::MCP::SpecRunTool do
@@ -75,20 +76,50 @@ RSpec.describe "Coatepec MCP tools" do
     it "says there is no separate Minitest tool" do
       expect(described_class.description).to include("no separate Minitest tool")
     end
+
+    it "fills omitted inputs from the project config before calling the worker manager" do
+      config = instance_double(Coatepec::ProjectConfig)
+      allow(config).to receive(:defaults_for).with(:spec_run).and_return(include_stdout: "always", timeout_seconds: 300)
+      allow(Coatepec::ProjectConfig).to receive(:new).with("/app").and_return(config)
+      allow(worker_manager).to receive(:run_spec).and_return(status: "passed")
+
+      described_class.call(paths: ["spec/x_spec.rb"], include_passing: true, server_context: server_context)
+
+      expect(worker_manager).to have_received(:run_spec)
+        .with(hash_including(include_passing: true, include_stdout: "always", timeout_seconds: 300))
+    end
+
+    it "says defaults can come from .coatepec.yml" do
+      expect(described_class.description).to include(".coatepec.yml")
+    end
   end
 
   describe Coatepec::MCP::RuntimeStatusTool do
     it "returns an ok envelope with the worker status" do
-      allow(worker_manager).to receive(:status).and_return(environment: "test")
+      allow(worker_manager).to receive(:status)
+        .and_return(environment: "test", spec_strategy: "guarded_fork", fallbacks: 0)
 
       response = described_class.call(server_context: server_context)
       payload = JSON.parse(response.content.first[:text])
 
-      expect(payload["data"]).to eq("environment" => "test", "project_root" => "/app")
+      expect(payload["data"]).to eq(
+        "environment" => "test", "spec_strategy" => "guarded_fork", "fallbacks" => 0, "project_root" => "/app",
+        "defaults" => {
+          "spec_run" => { "include_passing" => false, "include_stdout" => "failures", "timeout_seconds" => 120 },
+          "routes" => { "engines" => "exclude" }
+        }
+      )
+      expect(payload["data"].keys.last(2)).to eq(%w[project_root defaults])
     end
 
     it "documents project_root" do
       expect(described_class.description).to include("project_root")
+    end
+
+    it "documents spec_strategy, fallbacks and defaults" do
+      expect(described_class.description).to include("spec_strategy")
+      expect(described_class.description).to include("fallbacks")
+      expect(described_class.description).to include("defaults")
     end
   end
 
@@ -176,6 +207,22 @@ RSpec.describe "Coatepec MCP tools" do
 
       expect(response.error?).to be(true)
       expect(payload["error"]["code"]).to eq("worker_disconnected")
+    end
+
+    it "fills an omitted engines from the project config before calling the worker manager" do
+      config = instance_double(Coatepec::ProjectConfig)
+      allow(config).to receive(:defaults_for).with(:routes).and_return(engines: "include")
+      allow(Coatepec::ProjectConfig).to receive(:new).with("/app").and_return(config)
+      allow(worker_manager).to receive(:routes).and_return(columns: [], rows: [], matched: 0, limit: 100,
+                                                           offset: 0, next_offset: nil)
+
+      described_class.call(server_context: server_context)
+
+      expect(worker_manager).to have_received(:routes).with(hash_including(engines: "include"))
+    end
+
+    it "says the engines default can come from .coatepec.yml" do
+      expect(described_class.description).to include(".coatepec.yml")
     end
   end
 

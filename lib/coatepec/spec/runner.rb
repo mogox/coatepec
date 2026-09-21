@@ -4,9 +4,9 @@ module Coatepec
   module Spec
     # Validates a `rails_spec_run` request's paths, picks the RSpec or
     # Minitest adapter from their shape, builds the CLI args, and delegates
-    # to the platform-appropriate process strategy (fork on Linux, spawn on
-    # macOS, or a guarded fork on macOS when the project opts in via
-    # .coatepec.yml).
+    # to the platform-appropriate process strategy (fork on Linux, and a
+    # guarded fork on macOS unless the project opts out via .coatepec.yml,
+    # which selects a fresh spawn per call).
     class Runner
       DEFAULT_TIMEOUT = 120
 
@@ -24,8 +24,17 @@ module Coatepec
         adapter.require_framework!
         args = adapter.build_args(validated[:selectors], example, seed, fail_fast)
 
-        strategy_class.new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
-                      .run(args, timeout_seconds, include_passing: include_passing, include_stdout: include_stdout)
+        result = strategy_class
+                 .new(@project_root, adapter: adapter, project: @project, rails_runtime: @rails_runtime)
+                 .run(args, timeout_seconds, include_passing: include_passing, include_stdout: include_stdout)
+        @rails_runtime&.record_execution_mode(result[:execution_mode])
+        result
+      end
+
+      # Reported by rails_runtime_status so a caller can see which path a run will take.
+      def strategy_name
+        { ForkStrategy => "fork", GuardedForkStrategy => "guarded_fork", SpawnStrategy => "spawn" }
+          .fetch(strategy_class)
       end
 
       private
@@ -49,9 +58,8 @@ module Coatepec
         end
       end
 
-      # Reading @project.config here means an invalid .coatepec.yml only
-      # raises :invalid_config on macOS -- the Linux branch never touches it.
-      # Accepted asymmetry: the file exists to configure this branch.
+      # Forking is the default; only an explicit `macos_fork: false` spawns. Only the macOS
+      # branch reads the file here; the MCP layer reads it on every call for `defaults`.
       def macos_strategy_class
         @project.config.macos_fork? ? GuardedForkStrategy : SpawnStrategy
       end

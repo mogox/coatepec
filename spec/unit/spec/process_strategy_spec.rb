@@ -42,4 +42,34 @@ RSpec.describe Coatepec::Spec::ProcessStrategy do
       expect(File.exist?(json_path)).to be(false)
     end
   end
+
+  describe "#run" do
+    it "stamps the subclass's execution_mode on the result" do
+      stamped = Class.new(described_class) do
+        def start(_args, out_w, err_w, _json_path)
+          Process.spawn("true", out: out_w, err: err_w)
+        end
+
+        def execution_mode
+          "stamped"
+        end
+      end
+
+      result = stamped.new(Dir.pwd).run(["spec/passing_spec.rb"], 5)
+
+      expect(result.keys.last).to eq(:execution_mode)
+      expect(result[:execution_mode]).to eq("stamped")
+    end
+
+    it "requires subclasses to declare an execution_mode" do
+      bare = Class.new(described_class) do
+        def start(_args, out_w, err_w, _json_path)
+          Process.spawn("true", out: out_w, err: err_w)
+        end
+      end
+
+      expect { bare.new(Dir.pwd).run(["spec/passing_spec.rb"], 5) }
+        .to raise_error(NotImplementedError, /execution_mode/)
+    end
+  end
 end

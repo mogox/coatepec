@@ -58,8 +58,8 @@ MCP client
 Coatepec parent (Rails-free)
     `-- private NDJSON --> test worker (Rails "test", booted lazily, kept warm)
                               |-- Linux:  Process.fork  --> isolated RSpec/Minitest child
-                              `-- macOS:  Process.spawn --> fresh RSpec/Minitest process (default)
-                                          Process.fork, guarded --> opt-in, see Configuration
+                              `-- macOS:  Process.fork, guarded --> isolated RSpec/Minitest child (default)
+                                          Process.spawn --> fresh process, see Configuration (macos_fork: false)
 ```
 
 ## Configuration
@@ -68,28 +68,43 @@ An optional `.coatepec.yml` at the target Rails app's root enables
 per-project settings:
 
 ```yaml
-macos_fork: true                     # opt into forking on macOS (see below)
+macos_fork: false                    # opt out of forking on macOS (default true; see below)
 macos_fork_unsafe_gems: [some_gem]   # extends the built-in fork-unsafe denylist
+
+defaults:
+  spec_run:
+    include_passing: true            # true or false (default false)
+    include_stdout: always           # failures (default), always, never
+    timeout_seconds: 300             # 1..900 (default 120)
+  routes:
+    engines: include                 # include, exclude (default), only
 ```
 
 A missing file means every setting takes its default -- this file is never
 required.
+
+`defaults` sets project-wide values for those four inputs; a call argument
+always wins, an omitted key falls back to the built-in default, and an
+unknown key or value fails the call with `invalid_config` naming it. The
+file is re-read on every call, so edits apply immediately.
+`defaults.spec_run` applies to `rails_spec_run` only; `rails_spec_flaky_check`
+keeps its own per-round budget.
 
 Tool responses are compact JSON -- no indentation, nothing downstream reads
 it. Set `COATEPEC_PRETTY=1` in the MCP server's `env` (the same place as
 `OBJC_DISABLE_INITIALIZE_FORK_SAFETY` in the JSON example below) to
 pretty-print them when you are reading the sidecar by hand.
 
-### macOS fork (experimental, opt-in)
+### macOS fork (default since 0.9.0)
 
-On macOS, `rails_spec_run` normally spawns a fresh `bundle exec rspec`
-process per call, re-booting Rails every time -- the warm-worker speedup
-described above only applies on Linux by default. Setting `macos_fork:
-true` lets Coatepec attempt `Process.fork` on macOS too, reusing the warm
-boot the way Linux does.
+On macOS, `rails_spec_run` forks the warm worker for each call, reusing the
+boot the way it always has on Linux. Setting `macos_fork: false` in
+`.coatepec.yml` opts the project out: every call then spawns a fresh
+`bundle exec rspec` process and re-boots Rails, so only the Linux lane
+gets the warm-worker speedup described above.
 
-This is opt-in because forking a process with native extensions loaded
-isn't universally safe. Before each fork, Coatepec checks the worker's
+The fork is guarded, because forking a process with native extensions
+loaded isn't universally safe. Before each fork, Coatepec checks the worker's
 live thread count against its post-boot baseline and its loaded gems
 against a denylist, falling back to a fresh spawn for that one call if
 either check looks risky. The built-in denylist ships empty -- no single
@@ -98,17 +113,17 @@ thread-count-only until a project adds its own
 `macos_fork_unsafe_gems`. If a fork is attempted and the child crashes
 anyway, Coatepec transparently retries via spawn and returns that result
 -- fork stays enabled for later calls. Every `rails_spec_run` result
-includes an `execution_mode` field (`fork`, `spawn_fallback`, or
-`spawn_after_crash`) so you can see which path actually ran for a given
+includes an `execution_mode` field (`fork`, `spawn`, `spawn_fallback`,
+or `spawn_after_crash`) so you can see which path actually ran for a given
 call; `spawn_after_crash` results also carry the crashed fork's own stderr
 under `crashed_fork_stderr` so the crash can be diagnosed.
 
-`macos_fork: true` also effectively requires
-`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` in Coatepec's own environment.
-Without it, a forked child that touches an Objective-C-initialized class
-aborts -- Coatepec retries via spawn, so it degrades silently to the slow
-path (no crash, no error surfaced) rather than failing loudly, and you
-simply never get the speedup. Set it on the MCP server process itself:
+`OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` in Coatepec's own environment is
+recommended if you ever see `spawn_after_crash`. Without it, a forked child
+that touches an Objective-C-initialized class aborts -- Coatepec retries via
+spawn, so it degrades to the slow path for that call (no crash, no error
+surfaced) rather than failing loudly, and you simply never get the speedup.
+Set it on the MCP server process itself:
 
 ```json
 {
@@ -130,10 +145,10 @@ a no-op.
 
 | Tool | Input | Notes |
 |---|---|---|
-| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?`, `include_stdout?` (`failures` default, `always`, `never`) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; failure blocks in `stdout` that repeat an earlier block's error verbatim are replaced by a roll-up line naming the tests; returns `summary` counts (`example_count`, `failure_count`, `error_count`, `pending_count`, `assertion_count`, `duration`; the error and assertion counts come from Minitest and are `null` for RSpec) plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples); `stdout` is returned only for failing runs by default; `include_stdout: "always"` keeps it for green runs, `"never"` drops it always (the key stays, `null`); `stderr` is always returned; `child_pid`/`signaled`/`termsig`/`stopsig`/`coredump` appear only when the child did not exit normally (a timeout kill or a crash) |
-| `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state, and the project root (`project_root`) |
-| `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot |
-| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) | Returns `columns` (`name`, `verb`, `path`, `controller`, `action`, `engine`) and `rows` in that order; paths omit the `(.:format)` suffix Rails appends. Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
+| `rails_spec_run` | `paths: string[1..100]`, `example?`, `seed?`, `fail_fast?`, `timeout_seconds?` (1..900, default 120), `include_passing?`, `include_stdout?` (`failures` default, `always`, `never`) (all three default-able in `.coatepec.yml`) | RSpec (`spec/**/*_spec.rb`) or Minitest (`test/**/*_test.rb`), chosen from the paths; isolated per run; output capped at 256 KiB per stream; failure blocks in `stdout` that repeat an earlier block's error verbatim are replaced by a roll-up line naming the tests; returns `summary` counts (`example_count`, `failure_count`, `error_count`, `pending_count`, `assertion_count`, `duration`; the error and assertion counts come from Minitest and are `null` for RSpec) plus only the failed/pending `examples`, pass `include_passing: true` for the full roster (still capped at 500 examples); `stdout` is returned only for failing runs by default; `include_stdout: "always"` keeps it for green runs, `"never"` drops it always (the key stays, `null`); `stderr` is always returned; `child_pid`/`signaled`/`termsig`/`stopsig`/`coredump` appear only when the child did not exit normally (a timeout kill or a crash); every result carries `execution_mode` (`fork`, `spawn`, `spawn_fallback`, `spawn_after_crash`) |
+| `rails_runtime_status` | `{}` | Reports Ruby/Rails versions, worker PID, boot_id, lifecycle state, the project root, `spec_strategy` (`fork`, `guarded_fork`, `spawn`), `fallbacks` (guarded-fork runs that fell back to spawn; `null` unless guarded) and `defaults` (the effective `rails_spec_run`/`rails_routes` defaults after `.coatepec.yml`) |
+| `rails_runtime_restart` | `{}` | Unconditionally respawns the worker, discarding its warm boot; returns the fresh worker's status, including `spec_strategy` and `fallbacks` |
+| `rails_routes` | `query?`, `limit?` (1..200, default 100), `offset?`, `engines?` (`exclude` default, `include`, `only`) (default-able in `.coatepec.yml`) | Returns `columns` (`name`, `verb`, `path`, `controller`, `action`, `engine`) and `rows` in that order; paths omit the `(.:format)` suffix Rails appends. Case-insensitive filter across name/verb/path/controller/action/engine. Application routes only by default; `engines: "include"` adds the routes of mounted engines (one level deep, paths prefixed with the mount point, `engine` naming the engine class; `null` for an application route), `"only"` returns just those. Every response carries `engines` (the filter applied) and `engines_excluded` (how many routes matching `query` the filter withheld), so nothing is hidden silently. The filter applies after `query` and before paging, so `matched`/`next_offset` describe the kept set. The engine's mount route counts as an application route. Routes Rails marks `internal` are omitted, like `bin/rails routes`. `next_offset` is the offset of the next page, or `null` on the last one |
 | `rails_model` | `name` (constant path, e.g. `Widget` or `Admin::Widget`), `fields?` (any of `columns`, `associations`, `validators`, `enums`; omitted or `[]` means none) | Returns `name`, `table_name`, `primary_key`, `abstract_class` and `counts` (the size of each of the four lists, each capped at 200) by default and only the lists named in `fields` -- so a how-many question costs a few dozen bytes and `fields: ["columns"]` asks for the one list you need; ActiveRecord models only; columns, associations, validators, enums -- no row data; validators are de-duplicated by class, attributes and options (a concern and the model body declaring the same validation count once), so the count can be lower than `klass.validators.size`; an array-valued validator option longer than 20 entries (a country-code `inclusion` list, say) is cut to its first 20 with `<option>_count` and `<option>_truncated: true` beside it |
 | `rails_controller` | `name` (constant path, e.g. `WidgetsController` or `Admin::ReportsController`) | Actions, action callbacks, concerns, and the routes reaching each action -- no request dispatch |
 | `rails_spec_flaky_check` | `paths`, `example?`, `timeout_seconds?` (per round, 1..900), `runs?` (2..20, default 5) | Runs the selection `runs` times with a fresh random seed each round; reports tests whose status was inconsistent across runs; RSpec or Minitest, chosen from the paths |
@@ -161,6 +176,18 @@ a no-op.
   routes mounted from it. Application routes always sort before engine routes,
   so an unfiltered listing (with `engines: "include"`) reads the way
   `bin/rails routes` does.
+- `engines_excluded` is a correctness signal, not only a saving. Engine
+  routes print their paths relative to the mount point, so
+  `bin/rails routes -g admin` cannot find an admin engine's routes at all: it
+  matches the mount line and answers "one admin route" with no hint that
+  anything is missing. `rails_routes(query: "admin")` returns that one row
+  plus `engines_excluded: 243`, so the reader knows the rest exists.
+- Opting in is the expensive path, and it paginates. A broad query with
+  `engines: "include"` on an app with a mounted admin engine costs several
+  times the default response and can still stop at the 100-row page of a
+  larger match (`next_offset` says so), where the default returned the
+  application's routes complete. Reach for `engines: "only"` with the
+  engine's class name when the engine's routes are the question.
 - An engine route's `name` is relative to its engine, not a top-level url
   helper: the row `["audits", "GET", "/widget_admin/audits",
   "widget_admin/audits", "index", "WidgetAdmin::Engine"]` is reached as
@@ -369,7 +396,7 @@ structure without ever handing it a REPL.
 Ruby `>= 3.2`, Rails `>= 7.1, < 8.2`, Minitest 5.x and 6.x (the fixture
 apps pin 6.0.6; the 5.x name-filter flag is unit-tested). CI tests three
 lanes: Rails 8.1 on Linux (primary), Rails 7.1 on Linux (compat), and Rails
-8.1 on macOS (which is where the guarded-fork path above actually forks).
+8.1 on macOS (the lane that exercises the guarded-fork path above).
 
 ## Development
 

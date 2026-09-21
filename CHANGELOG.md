@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.9.0
+
+- `rails_spec_run` results always carry `execution_mode`: `fork` (Linux, or
+  a macOS guarded fork that ran), `spawn` (macOS with `macos_fork: false`),
+  `spawn_fallback` (the guard declined to fork) or `spawn_after_crash` (the
+  forked child crashed and the run was retried). The key used to appear
+  only when the guarded fork was in play.
+- Behaviour change on macOS: projects that never set `macos_fork: true` now
+  fork the warm worker by default, the way it always has on Linux, using
+  the guarded fork shipped in 0.7.0 (thread-count and gem-denylist checks,
+  a spawn retry if the child crashes). Set `macos_fork: false` in
+  `.coatepec.yml` to keep a fresh spawn per call. Measured on a Rails
+  8.2.0.alpha app: 966 ms saved per run, no fallbacks across nine runs.
+  `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` is now a recommendation for
+  projects that see `spawn_after_crash`, not a requirement.
+- `.coatepec.yml` gains a `defaults` map: `spec_run.include_passing`,
+  `spec_run.include_stdout`, `spec_run.timeout_seconds` and `routes.engines`
+  set project-wide defaults for those inputs. A call argument always wins;
+  an omitted key means the built-in default; an unknown key or an
+  out-of-range value fails the call with `invalid_config` naming it. The
+  file is re-read on every call.
+- `rails_runtime_status` reports `spec_strategy` (`fork`, `guarded_fork` or
+  `spawn`), `fallbacks` (how many guarded-fork runs fell back to spawn in
+  this worker's lifetime; `null` unless the guarded fork is in use) and
+  `defaults` (the effective `rails_spec_run` and `rails_routes` defaults
+  after `.coatepec.yml`), so an agent can see every default in one call.
+  `fallbacks` also counts `rails_spec_flaky_check` rounds, which run through
+  the same strategy.
+
 ## 0.8.0
 
 - Tool responses are now compact JSON rather than pretty-printed (22-32%

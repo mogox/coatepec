@@ -8,15 +8,24 @@ module Coatepec
     # per worker process and reports its identity (pid, boot_id, versions,
     # lifecycle state) for rails_runtime_status.
     class RailsRuntime
-      attr_reader :pid, :boot_id, :boot_duration_ms, :ruby_version, :rails_version, :post_boot_thread_count
+      attr_reader :pid, :boot_id, :boot_duration_ms, :ruby_version, :rails_version, :post_boot_thread_count,
+                  :fallback_count
+
+      FALLBACK_MODES = %w[spawn_fallback spawn_after_crash].freeze
 
       def initialize(project_root)
         @project_root = project_root
         @booted = false
+        @fallback_count = 0
       end
 
       def booted?
         @booted
+      end
+
+      # A guarded fork that declined or crashed ran via spawn; rails_runtime_status reports how often.
+      def record_execution_mode(mode)
+        @fallback_count += 1 if FALLBACK_MODES.include?(mode)
       end
 
       def boot!

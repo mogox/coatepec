@@ -2,11 +2,12 @@
 
 module Coatepec
   module Spec
-    # Opt-in macOS fork strategy: attempts Process.fork like ForkStrategy
-    # (reusing the warm worker's boot), but only after two cheap guard
-    # checks pass, and transparently falls back to a fresh SpawnStrategy
-    # run -- for this call only -- when a guard fails or the forked child
-    # crashes. See docs/superpowers/specs/2026-07-31-macos-guarded-fork-design.md.
+    # The macOS fork strategy (the default since 0.9.0; macos_fork: false
+    # opts out): attempts Process.fork like ForkStrategy (reusing the warm
+    # worker's boot), but only after two cheap guard checks pass, and
+    # transparently falls back to a fresh SpawnStrategy run -- for this call
+    # only -- when a guard fails or the forked child crashes. See
+    # docs/superpowers/specs/2026-07-31-macos-guarded-fork-design.md.
     class GuardedForkStrategy < ForkStrategy
       # Intentionally empty at ship time: the one documented crash this
       # guards against didn't name a specific culprit gem, just "something
@@ -52,11 +53,11 @@ module Coatepec
           # Process.fork itself failed (Errno::EAGAIN/ENOMEM under
           # process-table pressure), so no child was ever produced -- from the
           # caller's side that is indistinguishable from a failed guard, hence
-          # the same mode. Opting into macos_fork must never surface an error
-          # that plain SpawnStrategy wouldn't have.
+          # the same mode. Forking on macOS must never surface an error that
+          # plain SpawnStrategy wouldn't have.
           return fallback_result(args, timeout_seconds, "spawn_fallback", result_options)
         end
-        return result.merge(execution_mode: "fork") unless crashed?(result)
+        return result unless crashed?(result)
 
         retry_after_crash(args, timeout_seconds, started_at, result, result_options)
       end

@@ -39,8 +39,9 @@ root-cause writeup and the fix options considered (forcing `SpawnStrategy`
 for profiled runs specifically, vs. detecting and raising a clear error on
 non-spawn strategies, vs. a Linux-only opt-out config knob). Paused
 specifically to wait for real signal on how coatepec is actually used
-(Linux vs. macOS, `macos_fork` adoption) before picking a fix, rather than
-guessing.
+(Linux vs. macOS, `macos_fork` adoption) -- `macos_fork` is the default from
+0.9.0, so the fork path is now the common case on both platforms -- before
+picking a fix, rather than guessing.
 
 ## Run Rails 8.1's built-in CI (`bin/ci`)
 

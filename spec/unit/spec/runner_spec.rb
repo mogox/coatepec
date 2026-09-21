@@ -36,10 +36,10 @@ RSpec.describe Coatepec::Spec::Runner do
       expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::ForkStrategy)
     end
 
-    it "spawns on macOS" do
+    it "uses GuardedForkStrategy on macOS by default" do
       stub_host_os("darwin24")
 
-      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::GuardedForkStrategy)
     end
 
     it "raises unsupported_platform on Windows" do
@@ -60,10 +60,37 @@ RSpec.describe Coatepec::Spec::Runner do
       end
     end
 
-    it "still uses SpawnStrategy on macOS when .coatepec.yml is absent" do
+    it "uses SpawnStrategy on macOS when .coatepec.yml sets macos_fork: false" do
       stub_host_os("darwin24")
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "Gemfile"), "source 'https://rubygems.org'\n")
+        File.write(File.join(dir, ".coatepec.yml"), "macos_fork: false\n")
+        configured_runner = described_class.new(dir)
 
-      expect(runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+        expect(configured_runner.send(:strategy_class)).to eq(Coatepec::Spec::SpawnStrategy)
+      end
+    end
+
+    it "names the strategy it would pick" do
+      stub_host_os("linux-gnu")
+      expect(runner.strategy_name).to eq("fork")
+
+      stub_host_os("darwin24")
+      expect(runner.strategy_name).to eq("guarded_fork")
+    end
+  end
+
+  describe "#run" do
+    it "reports the strategy's execution_mode to the rails runtime" do
+      allow(RbConfig::CONFIG).to receive(:[]).and_call_original
+      allow(RbConfig::CONFIG).to receive(:[]).with("host_os").and_return("linux-gnu")
+      strategy = instance_double(Coatepec::Spec::ForkStrategy, run: { status: "passed", execution_mode: "fork" })
+      allow(Coatepec::Spec::ForkStrategy).to receive(:new).and_return(strategy)
+      rails_runtime = instance_double(Coatepec::Worker::RailsRuntime, record_execution_mode: nil)
+
+      described_class.new(FIXTURE_APP_ROOT, rails_runtime: rails_runtime).run(paths: ["spec/passing_spec.rb"])
+
+      expect(rails_runtime).to have_received(:record_execution_mode).with("fork")
     end
   end
 end
